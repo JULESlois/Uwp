@@ -1,0 +1,16 @@
+:root {
+  font-family: "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+  font-synthesis: none;
+  --font-display: 300;
+  --ease-uwp: cubic-bezier(.1,.9,.2,1);
+  --radius-win8: 0px;
+  --radius-win10: 2px;
+  --nav-compact: 58px;
+  --nav-open: 214px;
+  --focus-size: 2px;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { margin: 0; min-width: 320px; min-height: 100%; }
+button, input, select { font: inherit; }
+button { color: inherit; }
