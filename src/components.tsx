@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useState, type KeyboardEvent, type ReactNode } from 'react'
 
 export type NavItem<T extends string> = { key: T; glyph: string; label: string }
 
@@ -19,8 +19,26 @@ export function Pivot<T extends string>({ tabs, value, onChange }: { tabs: Array
   return <div className="pivot" role="tablist">{tabs.map((tab) => <button key={tab.key} role="tab" aria-selected={value === tab.key} className={value === tab.key ? 'active' : ''} onClick={() => onChange(tab.key)}>{tab.label}</button>)}</div>
 }
 
+export function CheckBox({ checked, onChange, label, ariaLabel, stopPropagation = false }: { checked: boolean; onChange: (value: boolean) => void; label?: ReactNode; ariaLabel?: string; stopPropagation?: boolean }) {
+  return <label className="selector checkbox-selector" onClick={(event) => stopPropagation && event.stopPropagation()}><input type="checkbox" checked={checked} aria-label={ariaLabel} onChange={(event) => onChange(event.target.checked)} /><span className="selector-mark" aria-hidden="true">✓</span>{label && <span className="selector-label">{label}</span>}</label>
+}
+
+export function RadioButton({ checked, onChange, label, name, value, stopPropagation = false }: { checked: boolean; onChange: () => void; label?: ReactNode; name?: string; value?: string; stopPropagation?: boolean }) {
+  return <label className="selector radio-selector" onClick={(event) => stopPropagation && event.stopPropagation()}><input type="radio" checked={checked} name={name} value={value} onChange={onChange} /><span className="selector-mark" aria-hidden="true" />{label && <span className="selector-label">{label}</span>}</label>
+}
+
+export function ComboBox({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }> }) {
+  return <label className="field-label">{label}<span className="select-shell"><select value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select><i aria-hidden="true">⌄</i></span></label>
+}
+
 export function ToggleSwitch({ checked, onChange, label, detail }: { checked: boolean; onChange: (value: boolean) => void; label: string; detail?: string }) {
-  return <label className="setting-row"><span><strong>{label}</strong>{detail && <small>{detail}</small>}</span><input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} /><i className="switch" aria-hidden="true"><b /></i></label>
+  return <label className="setting-row"><span><strong>{label}</strong>{detail && <small>{detail}</small>}</span><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} /><i className="switch" aria-hidden="true"><b /></i></label>
+}
+
+export function AutoSuggestBox({ value, onChange, suggestions, placeholder = '搜索' }: { value: string; onChange: (value: string) => void; suggestions: string[]; placeholder?: string }) {
+  const [open, setOpen] = useState(false)
+  const matches = suggestions.filter((item) => item.toLowerCase().includes(value.toLowerCase())).slice(0, 5)
+  return <div className="autosuggest"><span className="autosuggest-input"><span aria-hidden="true">⌕</span><input value={value} placeholder={placeholder} onFocus={() => setOpen(true)} onChange={(event) => { onChange(event.target.value); setOpen(true) }} /></span>{open && value && matches.length > 0 && <div className="autosuggest-menu" role="listbox">{matches.map((item) => <button key={item} role="option" onMouseDown={(event) => event.preventDefault()} onClick={() => { onChange(item); setOpen(false) }}>{item}</button>)}</div>}</div>
 }
 
 export function Flyout({ open, onClose, anchor, children }: { open: boolean; onClose: () => void; anchor: ReactNode; children: ReactNode }) {
@@ -45,11 +63,22 @@ export function ContextMenu({ children, items }: { children: ReactNode; items: A
 export type ListItem = { key: string; title: string; detail?: string; glyph?: string }
 export function ListView({ items, selected, onSelectionChange }: { items: ListItem[]; selected: string[]; onSelectionChange: (keys: string[]) => void }) {
   const toggle = (key: string) => onSelectionChange(selected.includes(key) ? selected.filter((item) => item !== key) : [...selected, key])
-  return <div className="list-view" role="listbox" aria-multiselectable="true">{items.map((item) => <button key={item.key} role="option" aria-selected={selected.includes(item.key)} className={selected.includes(item.key) ? 'selected' : ''} onClick={() => toggle(item.key)}><i aria-hidden="true">{selected.includes(item.key) ? '✓' : ''}</i>{item.glyph && <span className="list-glyph" aria-hidden="true">{item.glyph}</span>}<span><strong>{item.title}</strong>{item.detail && <small>{item.detail}</small>}</span></button>)}</div>
+  const onKey = (event: KeyboardEvent<HTMLDivElement>, key: string) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggle(key) } }
+  return <div className="list-view" role="listbox" aria-multiselectable="true">{items.map((item) => { const active = selected.includes(item.key); return <div key={item.key} role="option" tabIndex={0} aria-selected={active} className={`list-row${active ? ' selected' : ''}`} onClick={() => toggle(item.key)} onKeyDown={(event) => onKey(event, item.key)}><CheckBox checked={active} onChange={() => toggle(item.key)} ariaLabel={`选择 ${item.title}`} stopPropagation />{item.glyph && <span className="list-glyph" aria-hidden="true">{item.glyph}</span>}<span className="list-copy"><strong>{item.title}</strong>{item.detail && <small>{item.detail}</small>}</span></div> })}</div>
+}
+
+export function GridView({ items, selected, onSelectionChange }: { items: ListItem[]; selected: string[]; onSelectionChange: (keys: string[]) => void }) {
+  const toggle = (key: string) => onSelectionChange(selected.includes(key) ? selected.filter((item) => item !== key) : [...selected, key])
+  return <div className="grid-view" role="listbox" aria-multiselectable="true">{items.map((item) => { const active = selected.includes(item.key); return <div className={`grid-item${active ? ' selected' : ''}`} key={item.key} role="option" aria-selected={active} tabIndex={0} onClick={() => toggle(item.key)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggle(item.key) } }}><CheckBox checked={active} onChange={() => toggle(item.key)} ariaLabel={`选择 ${item.title}`} stopPropagation /><span className="grid-glyph" aria-hidden="true">{item.glyph ?? '□'}</span><strong>{item.title}</strong><small>{item.detail}</small></div> })}</div>
 }
 
 export function SplitView({ pane, children }: { pane: ReactNode; children: ReactNode }) {
   return <div className="split-view"><aside>{pane}</aside><section>{children}</section></div>
+}
+
+export function MasterDetailsView({ items, value, onChange, renderDetail }: { items: ListItem[]; value: string; onChange: (key: string) => void; renderDetail: (item: ListItem) => ReactNode }) {
+  const current = items.find((item) => item.key === value) ?? items[0]
+  return <div className="master-details"><aside>{items.map((item) => <RadioButton key={item.key} name="master-details" value={item.key} checked={current?.key === item.key} onChange={() => onChange(item.key)} label={<span className="master-label"><strong>{item.title}</strong>{item.detail && <small>{item.detail}</small>}</span>} />)}</aside><section>{current && renderDetail(current)}</section></div>
 }
 
 export function SemanticZoom({ zoomedOut, onChange, overview, detail }: { zoomedOut: boolean; onChange: (value: boolean) => void; overview: ReactNode; detail: ReactNode }) {
@@ -57,11 +86,24 @@ export function SemanticZoom({ zoomedOut, onChange, overview, detail }: { zoomed
 }
 
 export function RevealSurface({ children }: { children: ReactNode }) {
-  return <div className="reveal-surface" onPointerMove={(event) => { const rect = event.currentTarget.getBoundingClientRect(); event.currentTarget.style.setProperty('--reveal-x', `${event.clientX - rect.left}px`); event.currentTarget.style.setProperty('--reveal-y', `${event.clientY - rect.top}px`) }}>{children}</div>
+  return <div className="reveal-surface" onPointerMove={(event) => { const rect = event.currentTarget.getBoundingClientRect(); const dx = event.clientX - (rect.left + rect.width / 2); const dy = event.clientY - (rect.top + rect.height / 2); const angle = Math.atan2(dy, dx) * 180 / Math.PI + 90; event.currentTarget.style.setProperty('--reveal-angle', `${angle}deg`) }}>{children}</div>
 }
 
 export function AcrylicPane({ children }: { children: ReactNode }) {
   return <div className="acrylic-pane">{children}</div>
+}
+
+export function TeachingTip({ open, title, children, anchor, onClose }: { open: boolean; title: string; children: ReactNode; anchor: ReactNode; onClose: () => void }) {
+  return <span className="teaching-anchor">{anchor}{open && <div className="teaching-tip" role="status"><button className="teaching-close" aria-label="关闭提示" onClick={onClose}>×</button><strong>{title}</strong><div>{children}</div></div>}</span>
+}
+
+export function CharmBar({ open, onOpen, onClose, onSelect }: { open: boolean; onOpen: () => void; onClose: () => void; onSelect: (command: string) => void }) {
+  const commands = [{ key: 'search', glyph: '⌕', label: '搜索' }, { key: 'share', glyph: '↗', label: '共享' }, { key: 'start', glyph: '⊞', label: '开始' }, { key: 'devices', glyph: '▣', label: '设备' }, { key: 'settings', glyph: '⚙', label: '设置' }]
+  return <><button className="edge-gesture" aria-label="打开超级按钮" onPointerEnter={onOpen} onClick={onOpen} /><aside className={`charm-bar${open ? ' open' : ''}`} aria-hidden={!open} onPointerLeave={onClose}>{commands.map((command) => <button key={command.key} onClick={() => onSelect(command.key)}><span aria-hidden="true">{command.glyph}</span><b>{command.label}</b></button>)}</aside></>
+}
+
+export function SnapView({ snapped, onChange }: { snapped: boolean; onChange: (value: boolean) => void }) {
+  return <div className={`snap-demo${snapped ? ' snapped' : ''}`}><div className="snap-main"><h3>主视图</h3><p>宽屏时使用完整内容区域；Snap 后保留核心阅读与操作。</p></div><aside><button className="button" onClick={() => onChange(!snapped)}>{snapped ? '恢复完整视图' : '模拟 Snap View'}</button><p>{snapped ? '320px 级窄栏状态' : '拖到屏幕边缘时切换布局状态'}</p></aside></div>
 }
 
 export function Tile({ title, meta, glyph, wide, tone = 'blue' }: { title: string; meta: string; glyph: string; wide?: boolean; tone?: 'blue' | 'green' | 'orange' | 'purple' | 'gray' }) {
