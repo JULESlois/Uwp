@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState, type DragEvent as ReactDragEvent, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import { Fragment, useEffect, useRef, useState, type DragEvent as ReactDragEvent, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { RadioButton, type ListItem } from './components'
 import { CheckBox } from './selectors'
 
 export type SelectionMode = 'none' | 'single' | 'multiple' | 'extended'
+type InputModality = 'mouse' | 'touch' | 'pen' | 'keyboard'
 
 type CollectionProps = {
   items: ListItem[]
@@ -17,6 +18,11 @@ type CollectionProps = {
 
 type Marquee = { left: number; top: number; width: number; height: number }
 type DropTarget = { key: string; after: boolean }
+type SwipeState = { key: string; offset: number; dragging: boolean }
+type SwipeStart = { key: string; x: number; y: number; time: number; lastX: number; lastTime: number; lastDx: number; baseOffset: number; pointerId: number; axis: 'x' | 'y' | null }
+
+const SWIPE_WIDTH = 120
+const SWIPE_OPEN_THRESHOLD = 60
 
 function firstEnabled(items: ListItem[]) {
   return items.find((item) => !item.disabled)?.key ?? ''
@@ -52,22 +58,35 @@ function adjacentOutsideIndex(items: ListItem[], keys: string[], direction: -1 |
   return -1
 }
 
+function pointerModality(pointerType: string): InputModality {
+  if (pointerType === 'touch') return 'touch'
+  if (pointerType === 'pen') return 'pen'
+  return 'mouse'
+}
+
 export function CollectionView({ items, selected, onSelectionChange, selectionMode = 'extended', onItemInvoked, reorderable = false, onReorder, layout = 'list' }: CollectionProps) {
   const root = useRef<HTMLDivElement>(null)
   const anchor = useRef<string>(selected[0] ?? firstEnabled(items))
-  const marqueeStart = useRef<{ x: number; y: number; rootLeft: number; rootTop: number } | null>(null)
+  const marqueeStart = useRef<{ x: number; y: number } | null>(null)
+  const marqueePointer = useRef<{ x: number; y: number } | null>(null)
   const marqueeBase = useRef<string[]>([])
-  const swipeStart = useRef<{ key: string; x: number; y: number } | null>(null)
+  const marqueeFrame = useRef<number | null>(null)
+  const swipeStart = useRef<SwipeStart | null>(null)
   const suppressClickKey = useRef<string | null>(null)
   const [focusKey, setFocusKey] = useState(selected.find((key) => items.some((item) => item.key === key && !item.disabled)) ?? firstEnabled(items))
   const [draggedKeys, setDraggedKeys] = useState<string[]>([])
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
   const [marquee, setMarquee] = useState<Marquee | null>(null)
-  const [swipedKey, setSwipedKey] = useState<string | null>(null)
+  const [swipe, setSwipe] = useState<SwipeState | null>(null)
+  const [modality, setModality] = useState<InputModality>('mouse')
 
   useEffect(() => {
     if (!items.some((item) => item.key === focusKey && !item.disabled)) setFocusKey(firstEnabled(items))
   }, [items, focusKey])
+
+  useEffect(() => () => {
+    if (marqueeFrame.current !== null) cancelAnimationFrame(marqueeFrame.current)
+  }, [])
 
   const focusIndex = (index: number) => {
     const item = items[index]
@@ -106,9 +125,8 @@ export function CollectionView({ items, selected, onSelectionChange, selectionMo
     const remaining = items.filter((item) => !keys.includes(item.key))
     const target = remaining.findIndex((item) => item.key === toKey)
     if (target < 0) return
-    const insertAt = target + (after ? 1 : 0)
     const next = [...remaining]
-    next.splice(insertAt, 0, ...moving)
+    next.splice(target + (after ? 1 : 0), 0, ...moving)
     onReorder?.(next)
     anchor.current = moving[0]?.key ?? anchor.current
     setFocusKey(moving[0]?.key ?? focusKey)
@@ -122,55 +140,117 @@ export function CollectionView({ items, selected, onSelectionChange, selectionMo
     return [item.key]
   }
 
+  const createDragGhost = (event: ReactDragEvent<HTMLDivElement>, keys: string[]) => {
+    const first = items.find((item) => item.key === keys[0])
+    const ghost = document.createElement('div')
+    ghost.className = 'collection-drag-ghost'
+    const title = document.createElement('strong')
+    title.textContent = first?.title ?? '项目'
+    ghost.append(title)
+    if (keys.length > 1) {
+      const count = document.createElement('span')
+      count.textContent = `${keys.length} 项`
+      ghost.append(count)
+    }
+    document.body.append(ghost)
+    event.dataTransfer.setDragImage(ghost, 22, 22)
+    requestAnimationFrame(() => ghost.remove())
+  }
+
   const dragStart = (event: ReactDragEvent<HTMLDivElement>, item: ListItem) => {
     if (!reorderable || item.disabled) return
     const keys = dragKeysFor(item)
     event.dataTransfer.effectAllowed = 'move'
     event.dataTransfer.setData('text/plain', JSON.stringify(keys))
+    createDragGhost(event, keys)
+    setSwipe(null)
     setDraggedKeys(keys)
   }
 
-  const beginMarquee = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0 || event.target !== event.currentTarget || (selectionMode !== 'multiple' && selectionMode !== 'extended')) return
-    const rect = event.currentTarget.getBoundingClientRect()
-    marqueeStart.current = { x: event.clientX, y: event.clientY, rootLeft: rect.left, rootTop: rect.top }
-    marqueeBase.current = event.ctrlKey || event.metaKey ? selected : []
-    if (!(event.ctrlKey || event.metaKey)) onSelectionChange([])
-    setSwipedKey(null)
-    setMarquee({ left: event.clientX - rect.left, top: event.clientY - rect.top, width: 0, height: 0 })
-    event.currentTarget.setPointerCapture(event.pointerId)
-  }
-
-  const moveMarquee = (event: ReactPointerEvent<HTMLDivElement>) => {
+  const updateMarquee = (clientX: number, clientY: number) => {
     const start = marqueeStart.current
     const host = root.current
     if (!start || !host) return
-    const leftClient = Math.min(start.x, event.clientX)
-    const rightClient = Math.max(start.x, event.clientX)
-    const topClient = Math.min(start.y, event.clientY)
-    const bottomClient = Math.max(start.y, event.clientY)
-    setMarquee({ left: leftClient - start.rootLeft, top: topClient - start.rootTop, width: rightClient - leftClient, height: bottomClient - topClient })
+    const hostRect = host.getBoundingClientRect()
+    const currentX = clientX - hostRect.left + host.scrollLeft
+    const currentY = clientY - hostRect.top + host.scrollTop
+    const left = Math.min(start.x, currentX)
+    const right = Math.max(start.x, currentX)
+    const top = Math.min(start.y, currentY)
+    const bottom = Math.max(start.y, currentY)
+    setMarquee({ left, top, width: right - left, height: bottom - top })
     const hits = Array.from(host.querySelectorAll<HTMLElement>('.collection-item')).flatMap((element, index) => {
       const item = items[index]
       if (!item || item.disabled) return []
       const rect = element.getBoundingClientRect()
-      const intersects = rect.left < rightClient && rect.right > leftClient && rect.top < bottomClient && rect.bottom > topClient
+      const itemLeft = rect.left - hostRect.left + host.scrollLeft
+      const itemRight = rect.right - hostRect.left + host.scrollLeft
+      const itemTop = rect.top - hostRect.top + host.scrollTop
+      const itemBottom = rect.bottom - hostRect.top + host.scrollTop
+      const intersects = itemLeft < right && itemRight > left && itemTop < bottom && itemBottom > top
       return intersects ? [item.key] : []
     })
     onSelectionChange(Array.from(new Set([...marqueeBase.current, ...hits])))
   }
 
+  const autoScrollStep = () => {
+    const pointer = marqueePointer.current
+    const host = root.current
+    if (!marqueeStart.current || !pointer || !host) {
+      marqueeFrame.current = null
+      return
+    }
+    const rect = host.getBoundingClientRect()
+    const edge = 54
+    let delta = 0
+    if (pointer.y < Math.max(0, rect.top) + edge) delta = -12
+    else if (pointer.y > Math.min(window.innerHeight, rect.bottom) - edge) delta = 12
+    if (delta) {
+      if (host.scrollHeight > host.clientHeight + 2 && pointer.y >= rect.top && pointer.y <= rect.bottom) host.scrollTop += delta
+      else window.scrollBy({ top: delta, behavior: 'auto' })
+      updateMarquee(pointer.x, pointer.y)
+    }
+    marqueeFrame.current = requestAnimationFrame(autoScrollStep)
+  }
+
+  const beginMarquee = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'touch' || event.button !== 0 || event.target !== event.currentTarget || (selectionMode !== 'multiple' && selectionMode !== 'extended')) return
+    const rect = event.currentTarget.getBoundingClientRect()
+    marqueeStart.current = { x: event.clientX - rect.left + event.currentTarget.scrollLeft, y: event.clientY - rect.top + event.currentTarget.scrollTop }
+    marqueePointer.current = { x: event.clientX, y: event.clientY }
+    marqueeBase.current = event.ctrlKey || event.metaKey ? selected : []
+    if (!(event.ctrlKey || event.metaKey)) onSelectionChange([])
+    setSwipe(null)
+    setMarquee({ left: marqueeStart.current.x, top: marqueeStart.current.y, width: 0, height: 0 })
+    event.currentTarget.setPointerCapture(event.pointerId)
+    if (marqueeFrame.current === null) marqueeFrame.current = requestAnimationFrame(autoScrollStep)
+  }
+
+  const moveMarquee = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!marqueeStart.current) return
+    marqueePointer.current = { x: event.clientX, y: event.clientY }
+    updateMarquee(event.clientX, event.clientY)
+  }
+
   const endMarquee = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (!marqueeStart.current) return
     marqueeStart.current = null
+    marqueePointer.current = null
     setMarquee(null)
+    if (marqueeFrame.current !== null) {
+      cancelAnimationFrame(marqueeFrame.current)
+      marqueeFrame.current = null
+    }
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
   }
 
   const beginSwipe = (event: ReactPointerEvent<HTMLDivElement>, item: ListItem) => {
     const target = event.target as HTMLElement
     if (layout !== 'list' || event.pointerType === 'mouse' || target.closest?.('.collection-selector,.reorder-grip,.swipe-action')) return
-    swipeStart.current = { key: item.key, x: event.clientX, y: event.clientY }
+    const baseOffset = swipe?.key === item.key ? swipe.offset : 0
+    if (swipe && swipe.key !== item.key) setSwipe(null)
+    swipeStart.current = { key: item.key, x: event.clientX, y: event.clientY, time: performance.now(), lastX: event.clientX, lastTime: performance.now(), lastDx: 0, baseOffset, pointerId: event.pointerId, axis: null }
+    event.currentTarget.setPointerCapture(event.pointerId)
   }
 
   const moveSwipe = (event: ReactPointerEvent<HTMLDivElement>, item: ListItem) => {
@@ -178,12 +258,30 @@ export function CollectionView({ items, selected, onSelectionChange, selectionMo
     if (!start || start.key !== item.key) return
     const dx = event.clientX - start.x
     const dy = event.clientY - start.y
-    if (Math.abs(dx) < Math.abs(dy) + 10) return
-    if (dx < -44) { setSwipedKey(item.key); suppressClickKey.current = item.key }
-    if (dx > 24) { setSwipedKey(null); suppressClickKey.current = item.key }
+    if (!start.axis && Math.max(Math.abs(dx), Math.abs(dy)) > 8) start.axis = Math.abs(dx) > Math.abs(dy) + 4 ? 'x' : 'y'
+    if (start.axis !== 'x') return
+    event.preventDefault()
+    const now = performance.now()
+    start.lastDx = (event.clientX - start.lastX) / Math.max(1, now - start.lastTime)
+    start.lastX = event.clientX
+    start.lastTime = now
+    const offset = Math.max(-SWIPE_WIDTH, Math.min(16, start.baseOffset + dx))
+    if (Math.abs(dx) > 10) suppressClickKey.current = item.key
+    setSwipe({ key: item.key, offset, dragging: true })
   }
 
-  const endSwipe = () => { swipeStart.current = null }
+  const endSwipe = (event: ReactPointerEvent<HTMLDivElement>, item: ListItem) => {
+    const start = swipeStart.current
+    if (!start || start.key !== item.key) return
+    const currentOffset = Math.max(-SWIPE_WIDTH, Math.min(16, start.baseOffset + (start.lastX - start.x)))
+    const open = start.axis === 'x' && (currentOffset <= -SWIPE_OPEN_THRESHOLD || start.lastDx < -0.55)
+    const close = start.axis === 'x' && start.lastDx > 0.55
+    const targetOffset = open && !close ? -SWIPE_WIDTH : 0
+    setSwipe({ key: item.key, offset: targetOffset, dragging: false })
+    swipeStart.current = null
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    if (!targetOffset) window.setTimeout(() => setSwipe((current) => current?.key === item.key && current.offset === 0 ? null : current), 160)
+  }
 
   const renderSelector = (item: ListItem, active: boolean) => {
     if (selectionMode === 'none') return null
@@ -191,17 +289,22 @@ export function CollectionView({ items, selected, onSelectionChange, selectionMo
     return <span className="collection-selector"><CheckBox checked={active} disabled={item.disabled} onChange={() => selectItem(item, { ctrlKey: true })} ariaLabel={`选择 ${item.title}`} stopPropagation /></span>
   }
 
-  return <div ref={root} className={`collection-view collection-${layout}`} data-selection-mode={selectionMode} role="listbox" aria-multiselectable={selectionMode === 'multiple' || selectionMode === 'extended' ? true : undefined} onPointerDown={beginMarquee} onPointerMove={moveMarquee} onPointerUp={endMarquee} onPointerCancel={endMarquee}>{items.map((item, index) => {
+  const openedSwipeKey = swipe && swipe.offset <= -SWIPE_OPEN_THRESHOLD ? swipe.key : null
+
+  return <div ref={root} className={`collection-view collection-${layout}${marquee ? ' marquee-active' : ''}`} data-selection-mode={selectionMode} data-modality={modality} role="listbox" aria-multiselectable={selectionMode === 'multiple' || selectionMode === 'extended' ? true : undefined} onPointerDownCapture={(event) => setModality(pointerModality(event.pointerType))} onKeyDownCapture={() => setModality('keyboard')} onPointerDown={beginMarquee} onPointerMove={moveMarquee} onPointerUp={endMarquee} onPointerCancel={endMarquee}>{items.map((item, index) => {
     const active = selected.includes(item.key)
     const dragging = draggedKeys.includes(item.key)
-    const rowClass = `collection-item${active ? ' selected' : ''}${item.disabled ? ' disabled' : ''}${dragging ? ' dragging' : ''}${swipedKey === item.key ? ' swiped' : ''}${dropTarget?.key === item.key ? (dropTarget.after ? ' drop-after' : ' drop-before') : ''}`
-    const itemContent = <div className="collection-item-content"><span className="reorder-grip" aria-hidden="true" data-enabled={reorderable && !item.disabled} />{renderSelector(item, active)}{item.glyph && <span className="collection-glyph" aria-hidden="true">{item.glyph}</span>}<span className="collection-copy"><strong>{item.title}</strong>{item.detail && <small>{item.detail}</small>}</span>{dragging && draggedKeys.length > 1 && <span className="drag-count" aria-hidden="true">{draggedKeys.length}</span>}</div>
-    return <div key={item.key} className={rowClass} role="option" aria-selected={selectionMode === 'none' ? undefined : active} aria-disabled={item.disabled || undefined} tabIndex={!item.disabled && focusKey === item.key ? 0 : -1} draggable={reorderable && !item.disabled} onFocus={() => !item.disabled && setFocusKey(item.key)} onClick={(event: ReactMouseEvent<HTMLDivElement>) => {
+    const itemSwipe = swipe?.key === item.key ? swipe : null
+    const swiped = openedSwipeKey === item.key
+    const placeholder = dropTarget?.key === item.key ? <div className={`collection-drop-placeholder collection-drop-${layout}`} aria-hidden="true" /> : null
+    const rowClass = `collection-item${active ? ' selected' : ''}${item.disabled ? ' disabled' : ''}${dragging ? ' dragging' : ''}${swiped ? ' swiped' : ''}${itemSwipe?.dragging ? ' swipe-dragging' : ''}`
+    const itemContent = <div className="collection-item-content" style={itemSwipe ? { transform: `translateX(${itemSwipe.offset}px)` } : undefined}><span className="reorder-grip" aria-hidden="true" data-enabled={reorderable && !item.disabled} />{renderSelector(item, active)}{item.glyph && <span className="collection-glyph" aria-hidden="true">{item.glyph}</span>}<span className="collection-copy"><strong>{item.title}</strong>{item.detail && <small>{item.detail}</small>}</span>{dragging && draggedKeys.length > 1 && <span className="drag-count" aria-hidden="true">{draggedKeys.length}</span>}</div>
+    const row = <div className={rowClass} role="option" aria-selected={selectionMode === 'none' ? undefined : active} aria-disabled={item.disabled || undefined} tabIndex={!item.disabled && focusKey === item.key ? 0 : -1} draggable={reorderable && !item.disabled} onFocus={() => !item.disabled && setFocusKey(item.key)} onClick={(event: ReactMouseEvent<HTMLDivElement>) => {
       if (suppressClickKey.current === item.key) { suppressClickKey.current = null; return }
-      if (swipedKey === item.key) { setSwipedKey(null); return }
+      if (itemSwipe && itemSwipe.offset < 0) { setSwipe({ key: item.key, offset: 0, dragging: false }); return }
       if (selectionMode === 'none') onItemInvoked?.(item)
       else selectItem(item, event)
-    }} onDoubleClick={() => !item.disabled && onItemInvoked?.(item)} onPointerDown={(event) => beginSwipe(event, item)} onPointerMove={(event) => moveSwipe(event, item)} onPointerUp={endSwipe} onPointerCancel={endSwipe} onDragStart={(event) => dragStart(event, item)} onDragEnd={() => { setDraggedKeys([]); setDropTarget(null) }} onDragOver={(event) => {
+    }} onDoubleClick={() => !item.disabled && onItemInvoked?.(item)} onPointerDown={(event) => beginSwipe(event, item)} onPointerMove={(event) => moveSwipe(event, item)} onPointerUp={(event) => endSwipe(event, item)} onPointerCancel={(event) => endSwipe(event, item)} onDragStart={(event) => dragStart(event, item)} onDragEnd={() => { setDraggedKeys([]); setDropTarget(null) }} onDragOver={(event) => {
       if (!reorderable || item.disabled || draggedKeys.includes(item.key)) return
       event.preventDefault()
       event.dataTransfer.dropEffect = 'move'
@@ -223,14 +326,15 @@ export function CollectionView({ items, selected, onSelectionChange, selectionMo
       if (event.altKey && reorderable && (event.key === 'ArrowDown' || event.key === 'ArrowRight')) { event.preventDefault(); const target = adjacentOutsideIndex(items, movingKeys, 1); if (target >= 0) moveItems(movingKeys, items[target]!.key, true); return }
       if (event.key === 'Enter') { event.preventDefault(); if (!item.disabled) onItemInvoked?.(item); return }
       if (event.key === ' ') { event.preventDefault(); selectItem(item, event); return }
-      if (event.key === 'Escape' && swipedKey) { event.preventDefault(); setSwipedKey(null); return }
+      if (event.key === 'Escape' && swipe) { event.preventDefault(); setSwipe(null); return }
       if (event.key === 'ArrowRight' && layout === 'grid') { event.preventDefault(); focusIndex(nextEnabledIndex(items, index, 1)) }
       if (event.key === 'ArrowLeft' && layout === 'grid') { event.preventDefault(); focusIndex(nextEnabledIndex(items, index, -1)) }
       if (event.key === 'ArrowDown') { event.preventDefault(); focusIndex(nextEnabledIndex(items, index, columns)) }
       if (event.key === 'ArrowUp') { event.preventDefault(); focusIndex(nextEnabledIndex(items, index, -columns)) }
       if (event.key === 'Home') { event.preventDefault(); const first = items.findIndex((candidate) => !candidate.disabled); if (first >= 0) focusIndex(first) }
       if (event.key === 'End') { event.preventDefault(); const rev = [...items].reverse().findIndex((candidate) => !candidate.disabled); if (rev >= 0) focusIndex(items.length - 1 - rev) }
-    }}>{layout === 'list' && <div className="swipe-actions" aria-hidden={swipedKey !== item.key}><button className="swipe-action" tabIndex={swipedKey === item.key ? 0 : -1} onClick={(event) => { event.stopPropagation(); onItemInvoked?.(item); setSwipedKey(null) }}>打开</button>{selectionMode !== 'none' && <button className="swipe-action" tabIndex={swipedKey === item.key ? 0 : -1} onClick={(event) => { event.stopPropagation(); selectItem(item, { ctrlKey: true }); setSwipedKey(null) }}>{active ? '取消' : '选择'}</button>}</div>}{itemContent}</div>
+    }}>{layout === 'list' && <div className="swipe-actions" aria-hidden={openedSwipeKey !== item.key}><button className="swipe-action" tabIndex={openedSwipeKey === item.key ? 0 : -1} onClick={(event) => { event.stopPropagation(); onItemInvoked?.(item); setSwipe(null) }}>打开</button>{selectionMode !== 'none' && <button className="swipe-action" tabIndex={openedSwipeKey === item.key ? 0 : -1} onClick={(event) => { event.stopPropagation(); selectItem(item, { ctrlKey: true }); setSwipe(null) }}>{active ? '取消' : '选择'}</button>}</div>}{itemContent}</div>
+    return <Fragment key={item.key}>{placeholder && !dropTarget?.after ? placeholder : null}{row}{placeholder && dropTarget?.after ? placeholder : null}</Fragment>
   })}{marquee && <div className="selection-marquee" style={marquee} aria-hidden="true" />}</div>
 }
 
