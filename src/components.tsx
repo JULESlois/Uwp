@@ -1,44 +1,49 @@
 import { useState, type KeyboardEvent, type ReactNode } from 'react'
 
 export type NavItem<T extends string> = { key: T; glyph: string; label: string }
+export type PaneMode = 'auto' | 'compact' | 'expanded'
 
-export function NavigationView<T extends string>({ items, value, onChange }: { items: NavItem<T>[]; value: T; onChange: (value: T) => void }) {
-  return <aside className="nav" aria-label="主导航"><div className="nav__brand"><span aria-hidden="true">▦</span><strong>UWP LAB</strong></div><nav>{items.map((item) => <button key={item.key} className={value === item.key ? 'active' : ''} aria-current={value === item.key ? 'page' : undefined} onClick={() => onChange(item.key)}><span aria-hidden="true">{item.glyph}</span><b>{item.label}</b></button>)}</nav></aside>
+export function NavigationView<T extends string>({ items, value, onChange, mode = 'auto' }: { items: NavItem<T>[]; value: T; onChange: (value: T) => void; mode?: PaneMode }) {
+  return <aside className={`nav nav--${mode}`} data-mode={mode} aria-label="主导航"><div className="nav__brand"><span aria-hidden="true">▦</span><strong>UWP LAB</strong></div><nav>{items.map((item) => <button key={item.key} className={value === item.key ? 'active' : ''} aria-current={value === item.key ? 'page' : undefined} onClick={() => onChange(item.key)}><span aria-hidden="true">{item.glyph}</span><b>{item.label}</b></button>)}</nav></aside>
 }
 
-export type Command = { label: string; glyph: string; onClick?: () => void; primary?: boolean }
+export type Command = { label: string; glyph: string; onClick?: () => void; primary?: boolean; disabled?: boolean }
 export function CommandBar({ commands }: { commands: Command[] }) {
-  return <div className="commandbar" role="toolbar" aria-label="命令栏">{commands.map((command) => <button key={command.label} className={command.primary ? 'primary' : ''} onClick={command.onClick}><span aria-hidden="true">{command.glyph}</span><b>{command.label}</b></button>)}</div>
+  return <div className="commandbar" role="toolbar" aria-label="命令栏">{commands.map((command) => <button key={command.label} disabled={command.disabled} className={command.primary ? 'primary' : ''} onClick={command.onClick}><span aria-hidden="true">{command.glyph}</span><b>{command.label}</b></button>)}</div>
 }
 
-export function AppBar({ commands }: { commands: Command[] }) {
-  return <div className="appbar" role="toolbar" aria-label="应用栏">{commands.map((command) => <button key={command.label} onClick={command.onClick}><span aria-hidden="true">{command.glyph}</span><b>{command.label}</b></button>)}</div>
+export function AppBar({ commands, className = '' }: { commands: Command[]; className?: string }) {
+  return <div className={`appbar ${className}`.trim()} role="toolbar" aria-label="应用栏">{commands.map((command) => <button key={command.label} disabled={command.disabled} onClick={command.onClick}><span aria-hidden="true">{command.glyph}</span><b>{command.label}</b></button>)}</div>
+}
+
+export function EdgeAppBar({ open, onOpen, onClose, commands }: { open: boolean; onOpen: () => void; onClose: () => void; commands: Command[] }) {
+  return <><button className="edge-appbar-hit" aria-label="打开底部应用栏" onPointerEnter={onOpen} onClick={onOpen} /><div className={`edge-appbar${open ? ' open' : ''}`} onPointerLeave={onClose}><AppBar commands={commands} /></div></>
 }
 
 export function Pivot<T extends string>({ tabs, value, onChange }: { tabs: Array<{ key: T; label: string }>; value: T; onChange: (value: T) => void }) {
   return <div className="pivot" role="tablist">{tabs.map((tab) => <button key={tab.key} role="tab" aria-selected={value === tab.key} className={value === tab.key ? 'active' : ''} onClick={() => onChange(tab.key)}>{tab.label}</button>)}</div>
 }
 
-export function CheckBox({ checked, onChange, label, ariaLabel, stopPropagation = false }: { checked: boolean; onChange: (value: boolean) => void; label?: ReactNode; ariaLabel?: string; stopPropagation?: boolean }) {
-  return <label className="selector checkbox-selector" onClick={(event) => stopPropagation && event.stopPropagation()}><input type="checkbox" checked={checked} aria-label={ariaLabel} onChange={(event) => onChange(event.target.checked)} /><span className="selector-mark" aria-hidden="true">✓</span>{label && <span className="selector-label">{label}</span>}</label>
+export function CheckBox({ checked, onChange, label, ariaLabel, stopPropagation = false, disabled = false }: { checked: boolean; onChange: (value: boolean) => void; label?: ReactNode; ariaLabel?: string; stopPropagation?: boolean; disabled?: boolean }) {
+  return <label className={`selector checkbox-selector${disabled ? ' disabled' : ''}`} onClick={(event) => stopPropagation && event.stopPropagation()}><input type="checkbox" checked={checked} disabled={disabled} aria-label={ariaLabel} onChange={(event) => onChange(event.target.checked)} /><span className="selector-mark" aria-hidden="true">✓</span>{label && <span className="selector-label">{label}</span>}</label>
 }
 
-export function RadioButton({ checked, onChange, label, name, value, stopPropagation = false }: { checked: boolean; onChange: () => void; label?: ReactNode; name?: string; value?: string; stopPropagation?: boolean }) {
-  return <label className="selector radio-selector" onClick={(event) => stopPropagation && event.stopPropagation()}><input type="radio" checked={checked} name={name} value={value} onChange={onChange} /><span className="selector-mark" aria-hidden="true" />{label && <span className="selector-label">{label}</span>}</label>
+export function RadioButton({ checked, onChange, label, name, value, stopPropagation = false, disabled = false }: { checked: boolean; onChange: () => void; label?: ReactNode; name?: string; value?: string; stopPropagation?: boolean; disabled?: boolean }) {
+  return <label className={`selector radio-selector${disabled ? ' disabled' : ''}`} onClick={(event) => stopPropagation && event.stopPropagation()}><input type="radio" checked={checked} disabled={disabled} name={name} value={value} onChange={onChange} /><span className="selector-mark" aria-hidden="true" />{label && <span className="selector-label">{label}</span>}</label>
 }
 
-export function ComboBox({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }> }) {
-  return <label className="field-label">{label}<span className="select-shell"><select value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select><i aria-hidden="true">⌄</i></span></label>
+export function ComboBox({ label, value, onChange, options, disabled = false }: { label: string; value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }>; disabled?: boolean }) {
+  return <label className={`field-label${disabled ? ' disabled' : ''}`}>{label}<span className="select-shell"><select value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select><i aria-hidden="true">⌄</i></span></label>
 }
 
-export function ToggleSwitch({ checked, onChange, label, detail }: { checked: boolean; onChange: (value: boolean) => void; label: string; detail?: string }) {
-  return <label className="setting-row"><span><strong>{label}</strong>{detail && <small>{detail}</small>}</span><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} /><i className="switch" aria-hidden="true"><b /></i></label>
+export function ToggleSwitch({ checked, onChange, label, detail, disabled = false }: { checked: boolean; onChange: (value: boolean) => void; label: string; detail?: string; disabled?: boolean }) {
+  return <label className={`setting-row${disabled ? ' disabled' : ''}`}><span><strong>{label}</strong>{detail && <small>{detail}</small>}</span><input type="checkbox" checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} /><i className="switch" aria-hidden="true"><b /></i></label>
 }
 
-export function AutoSuggestBox({ value, onChange, suggestions, placeholder = '搜索' }: { value: string; onChange: (value: string) => void; suggestions: string[]; placeholder?: string }) {
+export function AutoSuggestBox({ value, onChange, suggestions, placeholder = '搜索', disabled = false }: { value: string; onChange: (value: string) => void; suggestions: string[]; placeholder?: string; disabled?: boolean }) {
   const [open, setOpen] = useState(false)
   const matches = suggestions.filter((item) => item.toLowerCase().includes(value.toLowerCase())).slice(0, 5)
-  return <div className="autosuggest"><span className="autosuggest-input"><span aria-hidden="true">⌕</span><input value={value} placeholder={placeholder} onFocus={() => setOpen(true)} onChange={(event) => { onChange(event.target.value); setOpen(true) }} /></span>{open && value && matches.length > 0 && <div className="autosuggest-menu" role="listbox">{matches.map((item) => <button key={item} role="option" onMouseDown={(event) => event.preventDefault()} onClick={() => { onChange(item); setOpen(false) }}>{item}</button>)}</div>}</div>
+  return <div className={`autosuggest${disabled ? ' disabled' : ''}`}><span className="autosuggest-input"><span aria-hidden="true">⌕</span><input value={value} disabled={disabled} placeholder={placeholder} onFocus={() => setOpen(true)} onChange={(event) => { onChange(event.target.value); setOpen(true) }} /></span>{!disabled && open && value && matches.length > 0 && <div className="autosuggest-menu" role="listbox">{matches.map((item) => <button key={item} role="option" onMouseDown={(event) => event.preventDefault()} onClick={() => { onChange(item); setOpen(false) }}>{item}</button>)}</div>}</div>
 }
 
 export function Flyout({ open, onClose, anchor, children }: { open: boolean; onClose: () => void; anchor: ReactNode; children: ReactNode }) {
@@ -55,21 +60,21 @@ export function SettingsPane({ open, title, onClose, children }: { open: boolean
   return <div className="settings-layer"><button className="settings-scrim" aria-label="关闭设置面板" onClick={onClose} /><aside className="settings-pane" aria-label={title}><header><button onClick={onClose} aria-label="返回">←</button><h2>{title}</h2></header>{children}</aside></div>
 }
 
-export function ContextMenu({ children, items }: { children: ReactNode; items: Array<{ label: string; onClick?: () => void }> }) {
+export function ContextMenu({ children, items }: { children: ReactNode; items: Array<{ label: string; onClick?: () => void; disabled?: boolean }> }) {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
-  return <div className="context-host" onContextMenu={(event) => { event.preventDefault(); setMenu({ x: event.clientX, y: event.clientY }) }}>{children}{menu && <><button className="context-scrim" aria-label="关闭上下文菜单" onClick={() => setMenu(null)} /><div className="context-menu" role="menu" style={{ left: menu.x, top: menu.y }}>{items.map((item) => <button key={item.label} role="menuitem" onClick={() => { item.onClick?.(); setMenu(null) }}>{item.label}</button>)}</div></>}</div>
+  return <div className="context-host" onContextMenu={(event) => { event.preventDefault(); setMenu({ x: event.clientX, y: event.clientY }) }}>{children}{menu && <><button className="context-scrim" aria-label="关闭上下文菜单" onClick={() => setMenu(null)} /><div className="context-menu" role="menu" style={{ left: menu.x, top: menu.y }}>{items.map((item) => <button key={item.label} disabled={item.disabled} role="menuitem" onClick={() => { item.onClick?.(); setMenu(null) }}>{item.label}</button>)}</div></>}</div>
 }
 
-export type ListItem = { key: string; title: string; detail?: string; glyph?: string }
+export type ListItem = { key: string; title: string; detail?: string; glyph?: string; disabled?: boolean }
 export function ListView({ items, selected, onSelectionChange }: { items: ListItem[]; selected: string[]; onSelectionChange: (keys: string[]) => void }) {
-  const toggle = (key: string) => onSelectionChange(selected.includes(key) ? selected.filter((item) => item !== key) : [...selected, key])
-  const onKey = (event: KeyboardEvent<HTMLDivElement>, key: string) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggle(key) } }
-  return <div className="list-view" role="listbox" aria-multiselectable="true">{items.map((item) => { const active = selected.includes(item.key); return <div key={item.key} role="option" tabIndex={0} aria-selected={active} className={`list-row${active ? ' selected' : ''}`} onClick={() => toggle(item.key)} onKeyDown={(event) => onKey(event, item.key)}><CheckBox checked={active} onChange={() => toggle(item.key)} ariaLabel={`选择 ${item.title}`} stopPropagation />{item.glyph && <span className="list-glyph" aria-hidden="true">{item.glyph}</span>}<span className="list-copy"><strong>{item.title}</strong>{item.detail && <small>{item.detail}</small>}</span></div> })}</div>
+  const toggle = (item: ListItem) => { if (item.disabled) return; onSelectionChange(selected.includes(item.key) ? selected.filter((key) => key !== item.key) : [...selected, item.key]) }
+  const onKey = (event: KeyboardEvent<HTMLDivElement>, item: ListItem) => { if (!item.disabled && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); toggle(item) } }
+  return <div className="list-view" role="listbox" aria-multiselectable="true">{items.map((item) => { const active = selected.includes(item.key); return <div key={item.key} role="option" tabIndex={item.disabled ? -1 : 0} aria-disabled={item.disabled || undefined} aria-selected={active} className={`list-row${active ? ' selected' : ''}${item.disabled ? ' disabled' : ''}`} onClick={() => toggle(item)} onKeyDown={(event) => onKey(event, item)}><CheckBox checked={active} disabled={item.disabled} onChange={() => toggle(item)} ariaLabel={`选择 ${item.title}`} stopPropagation />{item.glyph && <span className="list-glyph" aria-hidden="true">{item.glyph}</span>}<span className="list-copy"><strong>{item.title}</strong>{item.detail && <small>{item.detail}</small>}</span></div> })}</div>
 }
 
 export function GridView({ items, selected, onSelectionChange }: { items: ListItem[]; selected: string[]; onSelectionChange: (keys: string[]) => void }) {
-  const toggle = (key: string) => onSelectionChange(selected.includes(key) ? selected.filter((item) => item !== key) : [...selected, key])
-  return <div className="grid-view" role="listbox" aria-multiselectable="true">{items.map((item) => { const active = selected.includes(item.key); return <div className={`grid-item${active ? ' selected' : ''}`} key={item.key} role="option" aria-selected={active} tabIndex={0} onClick={() => toggle(item.key)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggle(item.key) } }}><CheckBox checked={active} onChange={() => toggle(item.key)} ariaLabel={`选择 ${item.title}`} stopPropagation /><span className="grid-glyph" aria-hidden="true">{item.glyph ?? '□'}</span><strong>{item.title}</strong><small>{item.detail}</small></div> })}</div>
+  const toggle = (item: ListItem) => { if (item.disabled) return; onSelectionChange(selected.includes(item.key) ? selected.filter((key) => key !== item.key) : [...selected, item.key]) }
+  return <div className="grid-view" role="listbox" aria-multiselectable="true">{items.map((item) => { const active = selected.includes(item.key); return <div className={`grid-item${active ? ' selected' : ''}${item.disabled ? ' disabled' : ''}`} key={item.key} role="option" aria-disabled={item.disabled || undefined} aria-selected={active} tabIndex={item.disabled ? -1 : 0} onClick={() => toggle(item)} onKeyDown={(event) => { if (!item.disabled && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); toggle(item) } }}><CheckBox checked={active} disabled={item.disabled} onChange={() => toggle(item)} ariaLabel={`选择 ${item.title}`} stopPropagation /><span className="grid-glyph" aria-hidden="true">{item.glyph ?? '□'}</span><strong>{item.title}</strong><small>{item.detail}</small></div> })}</div>
 }
 
 export function SplitView({ pane, children }: { pane: ReactNode; children: ReactNode }) {
@@ -77,8 +82,8 @@ export function SplitView({ pane, children }: { pane: ReactNode; children: React
 }
 
 export function MasterDetailsView({ items, value, onChange, renderDetail }: { items: ListItem[]; value: string; onChange: (key: string) => void; renderDetail: (item: ListItem) => ReactNode }) {
-  const current = items.find((item) => item.key === value) ?? items[0]
-  return <div className="master-details"><aside>{items.map((item) => <RadioButton key={item.key} name="master-details" value={item.key} checked={current?.key === item.key} onChange={() => onChange(item.key)} label={<span className="master-label"><strong>{item.title}</strong>{item.detail && <small>{item.detail}</small>}</span>} />)}</aside><section>{current && renderDetail(current)}</section></div>
+  const current = items.find((item) => item.key === value) ?? items.find((item) => !item.disabled) ?? items[0]
+  return <div className="master-details"><aside>{items.map((item) => <RadioButton key={item.key} name="master-details" value={item.key} disabled={item.disabled} checked={current?.key === item.key} onChange={() => onChange(item.key)} label={<span className="master-label"><strong>{item.title}</strong>{item.detail && <small>{item.detail}</small>}</span>} />)}</aside><section>{current && renderDetail(current)}</section></div>
 }
 
 export function SemanticZoom({ zoomedOut, onChange, overview, detail }: { zoomedOut: boolean; onChange: (value: boolean) => void; overview: ReactNode; detail: ReactNode }) {
@@ -106,6 +111,6 @@ export function SnapView({ snapped, onChange }: { snapped: boolean; onChange: (v
   return <div className={`snap-demo${snapped ? ' snapped' : ''}`}><div className="snap-main"><h3>主视图</h3><p>宽屏时使用完整内容区域；Snap 后保留核心阅读与操作。</p></div><aside><button className="button" onClick={() => onChange(!snapped)}>{snapped ? '恢复完整视图' : '模拟 Snap View'}</button><p>{snapped ? '320px 级窄栏状态' : '拖到屏幕边缘时切换布局状态'}</p></aside></div>
 }
 
-export function Tile({ title, meta, glyph, wide, tone = 'blue' }: { title: string; meta: string; glyph: string; wide?: boolean; tone?: 'blue' | 'green' | 'orange' | 'purple' | 'gray' }) {
-  return <button className={`tile tile--${tone}${wide ? ' tile--wide' : ''}`}><span className="tile__glyph" aria-hidden="true">{glyph}</span><span className="tile__copy"><strong>{title}</strong><small>{meta}</small></span></button>
+export function Tile({ title, meta, glyph, wide, tone = 'blue', disabled = false }: { title: string; meta: string; glyph: string; wide?: boolean; tone?: 'blue' | 'green' | 'orange' | 'purple' | 'gray'; disabled?: boolean }) {
+  return <button disabled={disabled} className={`tile tile--${tone}${wide ? ' tile--wide' : ''}`}><span className="tile__glyph" aria-hidden="true">{glyph}</span><span className="tile__copy"><strong>{title}</strong><small>{meta}</small></span></button>
 }
