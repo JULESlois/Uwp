@@ -8,6 +8,7 @@ import './advanced.css'
 import './refinements.css'
 import './lifecycle.css'
 import './navigation-shell.css'
+import './command-icons.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
