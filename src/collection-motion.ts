@@ -1,3 +1,5 @@
+export {}
+
 type Rect = { left: number; top: number; width: number; height: number }
 type Snapshot = Map<string, Rect>
 type ActiveDrag = { sourceId: string; rects: Map<string, Rect>; expiresAt: number }
@@ -18,16 +20,7 @@ function directItems(view: HTMLElement) {
 }
 
 function identity(item: HTMLElement) {
-  const explicit = item.dataset.collectionKey
-  if (explicit) return explicit
-
-  // CollectionView currently keeps its React key internal. Use the stable visible
-  // item signature as a compatibility fallback so the motion layer stays decoupled
-  // from selection/reorder state. A future data-collection-key automatically wins.
-  const title = item.querySelector<HTMLElement>('.collection-copy strong')?.textContent?.trim() ?? ''
-  const detail = item.querySelector<HTMLElement>('.collection-copy small')?.textContent?.trim() ?? ''
-  const glyph = item.querySelector<HTMLElement>('.collection-glyph')?.textContent?.trim() ?? ''
-  return `${title}\u241f${detail}\u241f${glyph}`
+  return item.dataset.collectionKey?.trim() || null
 }
 
 function relativeRect(view: HTMLElement, item: HTMLElement): Rect {
@@ -48,7 +41,10 @@ function viewportRect(item: HTMLElement): Rect {
 
 function measure(view: HTMLElement): Snapshot {
   const result = new Map<string, Rect>()
-  for (const item of directItems(view)) result.set(identity(item), relativeRect(view, item))
+  for (const item of directItems(view)) {
+    const key = identity(item)
+    if (key) result.set(key, relativeRect(view, item))
+  }
   return result
 }
 
@@ -89,6 +85,7 @@ function animateView(view: HTMLElement) {
 
   for (const item of directItems(view)) {
     const key = identity(item)
+    if (!key) continue
     const current = after.get(key)
     if (!current) continue
 
@@ -195,7 +192,11 @@ function install() {
       ? directItems(view).filter((item) => item.classList.contains('selected') && !item.classList.contains('disabled'))
       : [target]
     const rects = new Map<string, Rect>()
-    candidates.forEach((item) => rects.set(identity(item), viewportRect(item)))
+    candidates.forEach((item) => {
+      const key = identity(item)
+      if (key) rects.set(key, viewportRect(item))
+    })
+    if (!rects.size) return
     activeDrag = {
       sourceId: view.dataset.collectionId ?? '',
       rects,
