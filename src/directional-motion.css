@@ -83,6 +83,54 @@
   to{opacity:1}
 }
 
+/* Keep the previous page in the layout while the next page enters. The old surface is inert
+   and moves only far enough to establish direction, then disappears before the incoming page settles. */
+.page-transition-stage{
+  display:grid;
+  align-items:start;
+  min-width:0;
+  isolation:isolate;
+}
+.page-transition-layer{
+  grid-area:1 / 1;
+  min-width:0;
+}
+.page-transition-layer.incoming{z-index:2}
+.page-transition-layer.outgoing{
+  z-index:1;
+  pointer-events:none;
+  user-select:none;
+  animation-duration:var(--motion-control);
+  animation-timing-function:var(--ease-exit);
+  animation-fill-mode:both;
+  will-change:opacity,transform;
+}
+.page-transition-layer.outgoing .page-enter{
+  animation-play-state:paused;
+}
+
+.win10[data-nav-direction="forward"] .page-transition-layer.outgoing{animation-name:uwp-page-forward-out}
+.win10[data-nav-direction="backward"] .page-transition-layer.outgoing{animation-name:uwp-page-backward-out}
+.win8[data-nav-direction="forward"] .page-transition-layer.outgoing{animation-name:metro-page-forward-out}
+.win8[data-nav-direction="backward"] .page-transition-layer.outgoing{animation-name:metro-page-backward-out}
+
+@keyframes uwp-page-forward-out{
+  from{opacity:1;transform:none}
+  to{opacity:0;transform:translate3d(-8px,0,0)}
+}
+@keyframes uwp-page-backward-out{
+  from{opacity:1;transform:none}
+  to{opacity:0;transform:translate3d(8px,0,0)}
+}
+@keyframes metro-page-forward-out{
+  from{opacity:1;transform:none}
+  to{opacity:.06;transform:translate3d(-24px,0,0)}
+}
+@keyframes metro-page-backward-out{
+  from{opacity:1;transform:none}
+  to{opacity:.06;transform:translate3d(20px,0,0)}
+}
+
 /* Era switching changes shell composition, not page position. Keep its chrome entrance local. */
 .win10 .commandbar{
   animation:uwp-command-shell-in var(--motion-panel) var(--ease-enter) both;
