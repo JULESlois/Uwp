@@ -2,7 +2,19 @@
   font-family: "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
   font-synthesis: none;
   --font-display: 300;
-  --ease-uwp: cubic-bezier(.1,.9,.2,1);
+
+  /* Motion system: state -> control -> panel -> page. */
+  --motion-state: 90ms;
+  --motion-fast: 130ms;
+  --motion-control: 160ms;
+  --motion-panel: 220ms;
+  --motion-page: 280ms;
+  --motion-stagger: 28ms;
+  --ease-standard: cubic-bezier(.2, 0, 0, 1);
+  --ease-enter: cubic-bezier(.1, .9, .2, 1);
+  --ease-exit: cubic-bezier(.7, 0, .84, 0);
+  --ease-uwp: var(--ease-enter);
+
   --nav-compact: 58px;
   --nav-open: 214px;
   --focus-size: 2px;
