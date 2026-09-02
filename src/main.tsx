@@ -12,6 +12,7 @@ import './command-icons.css'
 import './navigation-icons.css'
 import './era-hierarchy.css'
 import './navigation-modes.css'
+import './motion-system.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
