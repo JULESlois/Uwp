@@ -267,7 +267,7 @@ function install() {
       adopted: new Set<string>(),
       expiresAt: performance.now() + 1600,
     }
-  }, true)
+  })
 
   const retireDrag = () => {
     const drag = activeDrag
