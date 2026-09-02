@@ -1,0 +1,77 @@
+/* Navigation mode signatures -------------------------------------------------
+   Each NavigationView pane mode must remain visually and spatially distinct.
+   These are structural differences, not decorative skins. */
+
+/* Top is a primary navigation strip, not browser history chrome. The global
+   Alt+Left history gesture remains available, but Top itself never renders a
+   redundant back affordance. */
+.app.win10.nav-top .top-nav-back{display:none!important}
+/* TopNavigationView currently reserves 48px in its JS measurement once
+   navigation history exists. Reclaim approximately that space in the hidden
+   measuring strip until the reserve is removed from the component itself. */
+.app.win10.nav-top .top-navigation:has(.top-nav-back) .top-nav-measure>[data-measure-item]{padding-inline:10px}
+
+/* Left = persistent expanded pane. In the explicit Left study mode it does
+   not collapse into the same 58px rail used by LeftCompact. Auto keeps its
+   normal adaptive open/closed lifecycle. */
+.app.win10.nav-left .side-navigation,
+.app.win10.nav-expanded .side-navigation{width:214px!important}
+.app.win10.nav-left .side-navigation.closed,
+.app.win10.nav-expanded .side-navigation.closed{width:214px!important}
+.app.win10.nav-left .side-navigation-header,
+.app.win10.nav-expanded .side-navigation-header{grid-template-columns:1fr}
+.app.win10.nav-left .side-nav-toggle,
+.app.win10.nav-expanded .side-nav-toggle{display:none}
+.app.win10.nav-left .side-nav-brand,
+.app.win10.nav-expanded .side-nav-brand{display:flex;align-items:center;min-height:56px;padding:0 22px;opacity:1!important;pointer-events:auto!important}
+.app.win10.nav-left .side-navigation.closed .side-nav-action b,
+.app.win10.nav-expanded .side-navigation.closed .side-nav-action b{visibility:visible}
+.app.win10.nav-left>.shell,
+.app.win10.nav-expanded>.shell{padding-left:214px!important}
+
+/* LeftCompact = a real compact rail that reserves 58px and exposes every
+   primary destination as an icon. Opening the pane overlays from that rail. */
+.app.win10.nav-leftCompact .adaptive-overlay-nav.flat .overlay-rail,
+.app.win10.nav-compact .adaptive-overlay-nav.flat .overlay-rail{width:58px;background:var(--nav);border-right:1px solid color-mix(in srgb,var(--text) 16%,transparent)}
+.app.win10.nav-leftCompact .adaptive-overlay-nav.flat .overlay-rail nav,
+.app.win10.nav-compact .adaptive-overlay-nav.flat .overlay-rail nav{display:block}
+.app.win10.nav-leftCompact>.shell,
+.app.win10.nav-compact>.shell{padding-left:58px!important}
+
+/* LeftMinimal = no destination rail. Only the pane edge/toggle survives in
+   the closed state; content keeps the full width. */
+.app.win10.nav-leftMinimal>.shell{padding-left:0!important}
+.app.win10.nav-leftMinimal .adaptive-overlay-nav.minimal{--minimal-visible-edge:58px}
+.app.win10.nav-leftMinimal .adaptive-overlay-nav.minimal:not(.open) .minimal-pane-shell{box-shadow:1px 0 color-mix(in srgb,var(--text) 14%,transparent)}
+
+/* Explicit Overlay = transient hierarchical navigation. It must not look like
+   LeftCompact: no row of destination icons and no permanent content inset.
+   A narrow launcher rail remains on top of page content; the pane itself
+   starts at the viewport edge and covers content when opened. */
+.app.win10.nav-overlay>.shell{padding-left:0!important}
+.app.win10.nav-overlay .adaptive-overlay-nav.hierarchical .overlay-rail{width:52px;background:var(--nav);border-right:1px solid color-mix(in srgb,var(--text) 14%,transparent);box-shadow:none}
+.app.win10.nav-overlay .adaptive-overlay-nav.hierarchical .overlay-rail nav{display:none}
+.app.win10.nav-overlay .adaptive-overlay-nav.hierarchical .overlay-toggle{width:52px;height:56px}
+.app.win10.nav-overlay .adaptive-overlay-nav.hierarchical .overlay-pane{left:0!important;width:min(304px,calc(100vw - 52px))!important;box-shadow:12px 0 34px #0004}
+.app.win10.nav-overlay .adaptive-overlay-nav.hierarchical .overlay-pane>.navigation-header{padding-left:62px}
+.app.win10.nav-overlay .adaptive-overlay-nav.hierarchical .overlay-nav-scrim{inset:0!important}
+.app.win10.nav-overlay .adaptive-overlay-nav.hierarchical.open .overlay-rail{border-right-color:transparent}
+
+/* Keep the five modes legible on narrow windows without inventing another
+   layout. Explicit Left still degrades only when the viewport can no longer
+   physically accommodate a persistent 214px pane. */
+@media(max-width:759px){
+  .app.win10.nav-left>.shell,.app.win10.nav-expanded>.shell{padding-left:0!important}
+  .app.win10.nav-left .side-navigation,.app.win10.nav-expanded .side-navigation{display:none}
+  .app.win10.nav-overlay .adaptive-overlay-nav.hierarchical .overlay-rail{width:48px}
+  .app.win10.nav-overlay .adaptive-overlay-nav.hierarchical .overlay-toggle{width:48px}
+  .app.win10.nav-overlay .adaptive-overlay-nav.hierarchical .overlay-pane{width:min(292px,calc(100vw - 48px))!important}
+  .app.win10.nav-overlay .adaptive-overlay-nav.hierarchical .overlay-pane>.navigation-header{padding-left:58px}
+}
+
+@media(forced-colors:active){
+  .app.win10.nav-leftCompact .adaptive-overlay-nav.flat .overlay-rail,
+  .app.win10.nav-compact .adaptive-overlay-nav.flat .overlay-rail,
+  .app.win10.nav-overlay .adaptive-overlay-nav.hierarchical .overlay-rail{border-color:CanvasText}
+  .app.win10.nav-overlay .adaptive-overlay-nav.hierarchical .overlay-pane{box-shadow:none;outline:1px solid CanvasText}
+}
