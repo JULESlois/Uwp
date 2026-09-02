@@ -8,6 +8,7 @@ import { CheckBox } from './selectors'
 type Page = 'start' | 'controls' | 'views' | 'patterns' | 'settings'
 type Era = 'win8' | 'win10'
 type ControlTab = 'input' | 'selection' | 'status'
+type NavigationDirection = 'neutral' | 'forward' | 'backward'
 
 const pages: NavItem<Page>[] = [
   { key: 'start', glyph: '⌂', label: '开始' },
@@ -16,6 +17,13 @@ const pages: NavItem<Page>[] = [
   { key: 'patterns', glyph: '◫', label: '模式' },
   { key: 'settings', glyph: '⚙', label: '设置' },
 ]
+
+const pageOrder: Page[] = ['start', 'controls', 'views', 'patterns', 'settings']
+
+function navigationDirection(current: Page, next: Page): NavigationDirection {
+  if (current === next) return 'neutral'
+  return pageOrder.indexOf(next) > pageOrder.indexOf(current) ? 'forward' : 'backward'
+}
 
 const startGroups = [
   { name: '通讯', tiles: [<Tile key="mail" title="邮件" meta="3 条新消息" glyph="✉" wide />, <Tile key="people" title="人脉" meta="18 位联系人在线" glyph="◎" tone="purple" />] },
@@ -121,9 +129,20 @@ export default function App() {
   const [navMode, setNavMode] = useState<NavigationPaneMode>('auto')
   const [charms, setCharms] = useState(false)
   const [edgeAppBar, setEdgeAppBar] = useState(false)
+  const [navDirection, setNavDirection] = useState<NavigationDirection>('neutral')
+  const navigate = (next: Page) => {
+    if (next === page) return
+    setNavDirection(navigationDirection(page, next))
+    setPage(next)
+  }
+  const switchEra = (next: Era) => {
+    if (next === era) return
+    setNavDirection('neutral')
+    setEra(next)
+  }
   const reset = () => { setDark(true); setMotion(true); setCompact(false); setHighContrast(false); setNavMode('auto') }
-  const charmSelect = (command: string) => { if (command === 'start') setPage('start'); if (command === 'search') setPage('controls'); if (command === 'settings') setPage('settings'); setCharms(false) }
-  const edgeCommands = [{ label: '搜索', glyph: '⌕', onClick: () => { setPage('controls'); setEdgeAppBar(false) } }, { label: '开始', glyph: '⊞', onClick: () => { setPage('start'); setEdgeAppBar(false) } }, { label: '设置', glyph: '⚙', onClick: () => { setPage('settings'); setEdgeAppBar(false) } }]
-  const win10Commands: PriorityCommand[] = [{ label: '搜索', glyph: '⌕', priority: 'primary', onClick: () => setPage('controls') }, { label: '重置', glyph: '⟲', priority: 'primary', onClick: reset }, { label: '共享', glyph: '↗', priority: 'secondary' }, { label: '固定', glyph: '⌖', priority: 'secondary' }, { label: '同步', glyph: '↻', priority: 'secondary' }, { label: '设备', glyph: '▣', priority: 'secondary', disabled: true }]
-  return <div className={`app ${dark ? 'dark' : 'light'} ${era} nav-${navMode} ${motion ? '' : 'no-motion'} ${compact ? 'compact' : ''} ${highContrast ? 'high-contrast' : ''}`}>{era === 'win10' && <AdaptiveNavigationView items={pages} value={page} onChange={setPage} mode={navMode} />}{era === 'win8' && <><CharmBar open={charms} onOpen={() => { setCharms(true); setEdgeAppBar(false) }} onClose={() => setCharms(false)} onSelect={charmSelect} /><EdgeAppBar open={edgeAppBar} onOpen={() => { setEdgeAppBar(true); setCharms(false) }} onClose={() => setEdgeAppBar(false)} commands={edgeCommands} /></>}<main className="shell"><header className="topbar"><h1>{pages.find((item) => item.key === page)?.label}</h1><div className="era-switch" role="group" aria-label="设计年代"><button className={era === 'win8' ? 'active' : ''} onClick={() => setEra('win8')}>Windows 8</button><button className={era === 'win10' ? 'active' : ''} onClick={() => setEra('win10')}>Windows 10</button></div></header>{era === 'win10' && <PriorityCommandBar commands={win10Commands} />}{page === 'start' && <StartPage era={era} />}{page === 'controls' && <ControlsPage />}{page === 'views' && <ViewsPage />}{page === 'patterns' && <PatternsPage era={era} />}{page === 'settings' && <SettingsPage dark={dark} setDark={setDark} motion={motion} setMotion={setMotion} compact={compact} setCompact={setCompact} highContrast={highContrast} setHighContrast={setHighContrast} navMode={navMode} setNavMode={setNavMode} />}</main></div>
+  const charmSelect = (command: string) => { if (command === 'start') navigate('start'); if (command === 'search') navigate('controls'); if (command === 'settings') navigate('settings'); setCharms(false) }
+  const edgeCommands = [{ label: '搜索', glyph: '⌕', onClick: () => { navigate('controls'); setEdgeAppBar(false) } }, { label: '开始', glyph: '⊞', onClick: () => { navigate('start'); setEdgeAppBar(false) } }, { label: '设置', glyph: '⚙', onClick: () => { navigate('settings'); setEdgeAppBar(false) } }]
+  const win10Commands: PriorityCommand[] = [{ label: '搜索', glyph: '⌕', priority: 'primary', onClick: () => navigate('controls') }, { label: '重置', glyph: '⟲', priority: 'primary', onClick: reset }, { label: '共享', glyph: '↗', priority: 'secondary' }, { label: '固定', glyph: '⌖', priority: 'secondary' }, { label: '同步', glyph: '↻', priority: 'secondary' }, { label: '设备', glyph: '▣', priority: 'secondary', disabled: true }]
+  return <div className={`app ${dark ? 'dark' : 'light'} ${era} nav-${navMode} ${motion ? '' : 'no-motion'} ${compact ? 'compact' : ''} ${highContrast ? 'high-contrast' : ''}`} data-nav-direction={navDirection} data-page={page}>{era === 'win10' && <AdaptiveNavigationView items={pages} value={page} onChange={navigate} mode={navMode} />}{era === 'win8' && <><CharmBar open={charms} onOpen={() => { setCharms(true); setEdgeAppBar(false) }} onClose={() => setCharms(false)} onSelect={charmSelect} /><EdgeAppBar open={edgeAppBar} onOpen={() => { setEdgeAppBar(true); setCharms(false) }} onClose={() => setEdgeAppBar(false)} commands={edgeCommands} /></>}<main className="shell"><header className="topbar"><h1 key={page} className="page-title-transition">{pages.find((item) => item.key === page)?.label}</h1><div className="era-switch" role="group" aria-label="设计年代"><button className={era === 'win8' ? 'active' : ''} onClick={() => switchEra('win8')}>Windows 8</button><button className={era === 'win10' ? 'active' : ''} onClick={() => switchEra('win10')}>Windows 10</button></div></header>{era === 'win10' && <PriorityCommandBar commands={win10Commands} />}{page === 'start' && <StartPage era={era} />}{page === 'controls' && <ControlsPage />}{page === 'views' && <ViewsPage />}{page === 'patterns' && <PatternsPage era={era} />}{page === 'settings' && <SettingsPage dark={dark} setDark={setDark} motion={motion} setMotion={setMotion} compact={compact} setCompact={setCompact} highContrast={highContrast} setHighContrast={setHighContrast} navMode={navMode} setNavMode={setNavMode} />}</main></div>
 }
