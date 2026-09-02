@@ -12,11 +12,13 @@ const resizeObservers = new WeakMap<HTMLElement, ResizeObserver>()
 const DETAIL_MS = 160
 const LAYOUT_MS = 220
 const EASE = 'cubic-bezier(.1,.9,.2,1)'
+const NAV_CONTINUITY_SELECTOR = '.shell > .topbar,.shell > .priority-command-shell,.shell > .page-transition-stage'
 const SURFACE_SELECTOR = [
   '.semantic-zoom',
   '.semantic-zoom + .rules',
   '.master-details > section',
   '.split-view > section',
+  NAV_CONTINUITY_SELECTOR,
 ].join(',')
 
 function box(element: HTMLElement): Rect {
@@ -135,6 +137,19 @@ function schedule(elements: Iterable<HTMLElement>) {
   requestAnimationFrame(() => pending.forEach(animateSurface))
 }
 
+function navigationSignature(className: string) {
+  return className.split(/\s+/).filter((token) => token === 'win8' || token === 'win10' || token.startsWith('nav-')).join(' ')
+}
+
+function animateNavigationLayout(app: HTMLElement, previousClassName: string) {
+  if (navigationSignature(previousClassName) === navigationSignature(app.className)) return
+  const surfaces = Array.from(app.querySelectorAll<HTMLElement>(NAV_CONTINUITY_SELECTOR))
+  surfaces.forEach(register)
+  // MutationObserver runs before ResizeObserver delivery. Measure the new layout
+  // immediately so the old snapshot cannot be overwritten before FLIP begins.
+  surfaces.forEach(animateSurface)
+}
+
 function relatedSurfaces(node: Node) {
   const result = new Set<HTMLElement>()
   if (!(node instanceof Element)) return result
@@ -155,6 +170,14 @@ function install() {
   const observer = new MutationObserver((records) => {
     const changed = new Set<HTMLElement>()
     for (const record of records) {
+      if (record.type === 'attributes') {
+        const target = record.target
+        if (target instanceof HTMLElement && target.classList.contains('app') && record.attributeName === 'class') {
+          animateNavigationLayout(target, record.oldValue ?? '')
+        }
+        continue
+      }
+
       relatedSurfaces(record.target).forEach((element) => changed.add(element))
       record.addedNodes.forEach((node) => relatedSurfaces(node).forEach((element) => {
         register(element)
@@ -165,7 +188,14 @@ function install() {
     schedule(changed)
   })
 
-  observer.observe(document.documentElement, { childList: true, subtree: true, characterData: true })
+  observer.observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+    characterData: true,
+    attributes: true,
+    attributeOldValue: true,
+    attributeFilter: ['class'],
+  })
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once: true })
