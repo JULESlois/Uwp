@@ -65,16 +65,63 @@ function useAutoPaneMode() {
   return mode
 }
 
+function usePersistentBoolean(key: string, fallback = false) {
+  const [value, setValue] = useState(() => {
+    if (typeof window === 'undefined') return fallback
+    try { return window.sessionStorage.getItem(key) === '1' }
+    catch { return fallback }
+  })
+  useEffect(() => {
+    try { window.sessionStorage.setItem(key, value ? '1' : '0') }
+    catch { /* storage can be unavailable in hardened contexts */ }
+  }, [key, value])
+  return [value, setValue] as const
+}
+
+function useNavigationHistory<T extends string>(value: T, onChange: (value: T) => void) {
+  const stackRef = useRef<T[]>([])
+  const previousRef = useRef(value)
+  const suppressNextRef = useRef(false)
+  const [, setRevision] = useState(0)
+
+  useEffect(() => {
+    if (previousRef.current === value) return
+    if (suppressNextRef.current) suppressNextRef.current = false
+    else {
+      const next = [...stackRef.current, previousRef.current]
+      stackRef.current = next.slice(-24)
+    }
+    previousRef.current = value
+    setRevision((current) => current + 1)
+  }, [value])
+
+  const navigate = (next: T) => {
+    if (next !== value) onChange(next)
+  }
+
+  const goBack = () => {
+    const next = stackRef.current[stackRef.current.length - 1]
+    if (!next) return
+    stackRef.current = stackRef.current.slice(0, -1)
+    suppressNextRef.current = true
+    onChange(next)
+    setRevision((current) => current + 1)
+  }
+
+  return { navigate, goBack, canGoBack: stackRef.current.length > 0 }
+}
+
 export function AdaptiveNavigationView<T extends string>({ items, value, onChange, mode = 'auto' }: { items: NavItem<T>[]; value: T; onChange: (value: T) => void; mode?: NavigationPaneMode }) {
   const autoMode = useAutoPaneMode()
   const resolved = normalizeMode(mode, autoMode)
-  if (resolved === 'left') return <NavigationView items={items} value={value} onChange={onChange} mode="expanded" />
-  if (resolved === 'leftCompact') return <NavigationView items={items} value={value} onChange={onChange} mode="compact" />
-  if (resolved === 'top') return <TopNavigationView items={items} value={value} onChange={onChange} />
-  return <OverlayNavigationView items={items} value={value} onChange={onChange} minimal={resolved === 'leftMinimal'} />
+  const history = useNavigationHistory(value, onChange)
+  if (resolved === 'left') return <NavigationView items={items} value={value} onChange={history.navigate} mode="expanded" />
+  if (resolved === 'leftCompact') return <NavigationView items={items} value={value} onChange={history.navigate} mode="compact" />
+  if (resolved === 'top') return <TopNavigationView items={items} value={value} onChange={history.navigate} canGoBack={history.canGoBack} onBack={history.goBack} />
+  return <OverlayNavigationView items={items} value={value} onChange={history.navigate} minimal={resolved === 'leftMinimal'} canGoBack={history.canGoBack} onHistoryBack={history.goBack} />
 }
 
-function TopNavigationView<T extends string>({ items, value, onChange }: { items: NavItem<T>[]; value: T; onChange: (value: T) => void }) {
+function TopNavigationView<T extends string>({ items, value, onChange, canGoBack, onBack }: { items: NavItem<T>[]; value: T; onChange: (value: T) => void; canGoBack: boolean; onBack: () => void }) {
   const hostRef = useRef<HTMLElement>(null)
   const measureRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -88,7 +135,8 @@ function TopNavigationView<T extends string>({ items, value, onChange }: { items
     if (!host || !measureHost) return
     const measure = () => {
       const widths = Array.from(measureHost.querySelectorAll<HTMLElement>('[data-measure-item]')).map((item) => item.offsetWidth)
-      const available = Math.max(0, host.clientWidth - 24)
+      const backWidth = canGoBack ? 48 : 0
+      const available = Math.max(0, host.clientWidth - 24 - backWidth)
       const overflowWidth = 52
       let used = 0
       let count = 0
@@ -105,19 +153,24 @@ function TopNavigationView<T extends string>({ items, value, onChange }: { items
     observer.observe(host)
     measure()
     return () => observer.disconnect()
-  }, [items])
+  }, [items, canGoBack])
 
   useEffect(() => {
     if (!open) return
     requestAnimationFrame(() => menuRef.current?.querySelector<HTMLButtonElement>('button')?.focus())
   }, [open])
 
-  const visible = items.slice(0, visibleCount)
-  const overflow = items.slice(visibleCount)
+  const selectedIndex = items.findIndex((item) => item.key === value)
+  let visible = items.slice(0, visibleCount)
+  if (selectedIndex >= visibleCount && visibleCount > 0) {
+    visible = [...items.slice(0, Math.max(0, visibleCount - 1)), items[selectedIndex]!]
+  }
+  const visibleKeys = new Set(visible.map((item) => item.key))
+  const overflow = items.filter((item) => !visibleKeys.has(item.key))
   const overflowActive = overflow.some((item) => item.key === value)
 
   const moveTopFocus = (event: ReactKeyboardEvent<HTMLElement>, delta: number) => {
-    const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('.top-nav-action,.top-nav-more')).filter((button) => button.offsetParent !== null)
+    const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('.top-nav-back,.top-nav-action,.top-nav-more')).filter((button) => button.offsetParent !== null)
     if (!buttons.length) return
     const current = document.activeElement as HTMLButtonElement | null
     const index = Math.max(0, current ? buttons.indexOf(current) : 0)
@@ -140,13 +193,13 @@ function TopNavigationView<T extends string>({ items, value, onChange }: { items
   return <nav ref={hostRef} className="top-navigation" aria-label="主导航" onKeyDown={(event) => {
     if (event.key === 'ArrowRight') moveTopFocus(event, 1)
     if (event.key === 'ArrowLeft') moveTopFocus(event, -1)
-    if (event.key === 'Home') { event.preventDefault(); event.currentTarget.querySelector<HTMLButtonElement>('.top-nav-action')?.focus() }
-    if (event.key === 'End') { event.preventDefault(); const buttons = event.currentTarget.querySelectorAll<HTMLButtonElement>('.top-nav-action,.top-nav-more'); buttons[buttons.length - 1]?.focus() }
-  }}><div ref={measureRef} className="top-nav-measure" aria-hidden="true">{items.map((item) => <span key={item.key} data-measure-item><span>{item.glyph}</span>{item.label}</span>)}</div><div className="top-nav-items">{visible.map((item) => <button key={item.key} className={`top-nav-action${value === item.key ? ' active' : ''}`} aria-current={value === item.key ? 'page' : undefined} tabIndex={value === item.key || (!visible.some((candidate) => candidate.key === value) && item === visible[0]) ? 0 : -1} onClick={() => { onChange(item.key); setOpen(false) }}><span aria-hidden="true">{item.glyph}</span><b>{item.label}</b></button>)}{overflow.length > 0 && <button ref={moreRef} className={`top-nav-more${overflowActive ? ' active' : ''}`} aria-label="更多导航" aria-expanded={open} onClick={() => setOpen((current) => !current)}>•••</button>}</div>{open && overflow.length > 0 && <><button className="top-nav-scrim" aria-label="关闭更多导航" onClick={() => setOpen(false)} /><div ref={menuRef} className="top-nav-overflow" role="menu" onKeyDown={menuKey}>{overflow.map((item) => <button key={item.key} role="menuitem" className={value === item.key ? 'active' : ''} onClick={() => { onChange(item.key); setOpen(false) }}><span aria-hidden="true">{item.glyph}</span><b>{item.label}</b></button>)}</div></>}</nav>
+    if (event.key === 'Home') { event.preventDefault(); event.currentTarget.querySelector<HTMLButtonElement>('.top-nav-back,.top-nav-action')?.focus() }
+    if (event.key === 'End') { event.preventDefault(); const buttons = event.currentTarget.querySelectorAll<HTMLButtonElement>('.top-nav-back,.top-nav-action,.top-nav-more'); buttons[buttons.length - 1]?.focus() }
+  }}>{canGoBack && <button className="top-nav-back" aria-label="返回上一页" onClick={onBack}>←</button>}<div ref={measureRef} className="top-nav-measure" aria-hidden="true">{items.map((item) => <span key={item.key} data-measure-item><span>{item.glyph}</span>{item.label}</span>)}</div><div className="top-nav-items">{visible.map((item) => <button key={item.key} className={`top-nav-action${value === item.key ? ' active' : ''}`} aria-current={value === item.key ? 'page' : undefined} tabIndex={value === item.key || (!visible.some((candidate) => candidate.key === value) && item === visible[0]) ? 0 : -1} onClick={() => { onChange(item.key); setOpen(false) }}><span aria-hidden="true">{item.glyph}</span><b>{item.label}</b></button>)}{overflow.length > 0 && <button ref={moreRef} className={`top-nav-more${overflowActive ? ' active' : ''}`} aria-label="更多导航" aria-expanded={open} onClick={() => setOpen((current) => !current)}>•••</button>}</div>{open && overflow.length > 0 && <><button className="top-nav-scrim" aria-label="关闭更多导航" onClick={() => setOpen(false)} /><div ref={menuRef} className="top-nav-overflow" role="menu" onKeyDown={menuKey}>{overflow.map((item) => <button key={item.key} role="menuitem" className={value === item.key ? 'active' : ''} onClick={() => { onChange(item.key); setOpen(false) }}><span aria-hidden="true">{item.glyph}</span><b>{item.label}</b></button>)}</div></>}</nav>
 }
 
-function OverlayNavigationView<T extends string>({ items, value, onChange, minimal = false }: { items: NavItem<T>[]; value: T; onChange: (value: T) => void; minimal?: boolean }) {
-  const [open, setOpen] = useState(false)
+function OverlayNavigationView<T extends string>({ items, value, onChange, minimal = false, canGoBack, onHistoryBack }: { items: NavItem<T>[]; value: T; onChange: (value: T) => void; minimal?: boolean; canGoBack: boolean; onHistoryBack: () => void }) {
+  const [open, setOpen] = usePersistentBoolean(`uwp.navigation.${minimal ? 'leftMinimal' : 'overlay'}.open`)
   const [path, setPath] = useState<HierarchyNode<T>[]>([])
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(['group-features']))
   const paneRef = useRef<HTMLElement>(null)
@@ -177,7 +230,7 @@ function OverlayNavigationView<T extends string>({ items, value, onChange, minim
     requestAnimationFrame(() => toggleRef.current?.focus())
   }
 
-  const goBack = () => {
+  const goPaneBack = () => {
     if (path.length) setPath((current) => current.slice(0, -1))
     else close()
   }
@@ -194,7 +247,7 @@ function OverlayNavigationView<T extends string>({ items, value, onChange, minim
   const toggleNode = (id: string) => setNodeExpanded(id, !expanded.has(id))
 
   const paneKey = (event: ReactKeyboardEvent<HTMLElement>) => {
-    if (event.key === 'Escape') { event.preventDefault(); goBack(); return }
+    if (event.key === 'Escape') { event.preventDefault(); goPaneBack(); return }
     if (event.key === 'ArrowDown') { move(event, 1); return }
     if (event.key === 'ArrowUp') { move(event, -1); return }
     if (event.key === 'Home') { event.preventDefault(); visibleActions(event.currentTarget)[0]?.focus(); return }
@@ -207,7 +260,7 @@ function OverlayNavigationView<T extends string>({ items, value, onChange, minim
       if (event.key === 'ArrowRight' && node?.children?.length) { event.preventDefault(); setNodeExpanded(id, true); return }
       if (event.key === 'ArrowLeft') {
         if (expanded.has(id)) { event.preventDefault(); setNodeExpanded(id, false); return }
-        if (path.length) { event.preventDefault(); goBack() }
+        if (path.length) { event.preventDefault(); goPaneBack() }
       }
     }
   }
@@ -238,5 +291,12 @@ function OverlayNavigationView<T extends string>({ items, value, onChange, minim
     return <div key={node.id} className="overlay-tree-branch" style={depthStyle}><div className={`overlay-tree-node${active ? ' active' : ''}`}><button className="overlay-tree-action" data-node-id={node.id} aria-current={isLeafCurrent ? 'page' : undefined} aria-haspopup={hasChildren ? 'tree' : undefined} aria-expanded={hasChildren ? isExpanded : undefined} onClick={() => enterNode(node)}><span aria-hidden="true">{node.glyph}</span><b>{node.label}</b>{hasChildren ? <i className="overlay-enter" aria-hidden="true">›</i> : null}</button>{hasChildren ? <button className="overlay-disclosure" aria-label={`${isExpanded ? '折叠' : '展开'}${node.label}`} aria-expanded={isExpanded} onClick={(event) => { event.stopPropagation(); toggleNode(node.id) }}><span aria-hidden="true">⌄</span></button> : null}</div>{hasChildren && isExpanded ? <div className="overlay-tree-children" role="group">{renderNodes(node.children ?? [], depth + 1)}</div> : null}</div>
   })
 
-  return <div className={`adaptive-overlay-nav${minimal ? ' minimal' : ''}`}>{minimal ? <button ref={toggleRef} className="minimal-nav-toggle" aria-label="打开导航窗格" aria-expanded={open} onClick={() => { if (open) close(); else setOpen(true) }}><span aria-hidden="true">☰</span></button> : <aside className="overlay-rail" aria-label="主导航"><button ref={toggleRef} className="overlay-toggle" aria-label="打开导航窗格" aria-expanded={open} onClick={() => { if (open) close(); else setOpen(true) }}><span aria-hidden="true">☰</span></button><nav>{items.map((item) => <button key={item.key} className={value === item.key ? 'active' : ''} aria-current={value === item.key ? 'page' : undefined} aria-label={item.label} onClick={() => chooseDirect(item.key)}><span aria-hidden="true">{item.glyph}</span></button>)}</nav></aside>}{open && <button className="overlay-nav-scrim" aria-label="关闭导航窗格" onClick={close} />}<aside ref={paneRef} className={`overlay-pane${open ? ' open' : ''}`} aria-hidden={!open} aria-label="展开导航" onKeyDown={paneKey}><header><button aria-label={path.length ? '返回上一级' : '收起导航窗格'} onClick={goBack}>{path.length ? '←' : '×'}</button><strong>{currentTitle}</strong></header><nav className="overlay-pane-list" aria-label={currentTitle}>{renderNodes(currentNodes)}</nav></aside></div>
+  const paneHeader = <header>{path.length ? <button className="overlay-pane-back" aria-label="返回上一级" onClick={goPaneBack}>←</button> : canGoBack ? <button className="overlay-pane-back" aria-label="返回上一页" onClick={onHistoryBack}>←</button> : <span className="overlay-pane-header-spacer" aria-hidden="true" />}<strong>{currentTitle}</strong></header>
+  const pane = <aside ref={paneRef} className={`overlay-pane${open ? ' open' : ''}`} aria-hidden={!open} aria-label="展开导航" onKeyDown={paneKey}>{paneHeader}<nav className="overlay-pane-list" aria-label={currentTitle}>{renderNodes(currentNodes)}</nav></aside>
+
+  if (minimal) {
+    return <div className={`adaptive-overlay-nav minimal${open ? ' open' : ''}`}>{open && <button className="overlay-nav-scrim" aria-label="关闭导航窗格" onClick={close} />}<div className={`minimal-pane-shell${open ? ' open' : ''}`}>{pane}<button ref={toggleRef} className="minimal-nav-toggle" aria-label={open ? '收起导航窗格' : '打开导航窗格'} aria-expanded={open} onClick={() => { if (open) close(); else setOpen(true) }}><span aria-hidden="true">{open ? '×' : '☰'}</span></button></div></div>
+  }
+
+  return <div className={`adaptive-overlay-nav${open ? ' open' : ''}`}><aside className="overlay-rail" aria-label="主导航"><button ref={toggleRef} className="overlay-toggle" aria-label={open ? '收起导航窗格' : '打开导航窗格'} aria-expanded={open} onClick={() => { if (open) close(); else setOpen(true) }}><span aria-hidden="true">{open ? '×' : '☰'}</span></button>{canGoBack && <button className="overlay-history-back" aria-label="返回上一页" onClick={onHistoryBack}>←</button>}<nav>{items.map((item) => <button key={item.key} className={value === item.key ? 'active' : ''} aria-current={value === item.key ? 'page' : undefined} aria-label={item.label} onClick={() => chooseDirect(item.key)}><span aria-hidden="true">{item.glyph}</span></button>)}</nav></aside>{open && <button className="overlay-nav-scrim" aria-label="关闭导航窗格" onClick={close} />}{pane}</div>
 }
