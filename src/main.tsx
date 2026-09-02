@@ -7,6 +7,7 @@ import './interaction.css'
 import './advanced.css'
 import './refinements.css'
 import './lifecycle.css'
+import './navigation-shell.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
