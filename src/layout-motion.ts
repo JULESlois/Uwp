@@ -1,3 +1,5 @@
+export {}
+
 type Rect = { left: number; top: number; width: number; height: number }
 type SurfaceKind = 'semantic' | 'detail' | 'continuity'
 
@@ -43,8 +45,12 @@ function signature(element: HTMLElement, kind: SurfaceKind) {
 }
 
 function currentSemanticSurface(host: HTMLElement) {
-  return Array.from(host.children).findLast?.((child) => child instanceof HTMLElement && !child.classList.contains('semantic-toolbar')) as HTMLElement | undefined
-    ?? Array.from(host.children).reverse().find((child): child is HTMLElement => child instanceof HTMLElement && !child.classList.contains('semantic-toolbar'))
+  const children = Array.from(host.children)
+  for (let index = children.length - 1; index >= 0; index -= 1) {
+    const child = children[index]
+    if (child instanceof HTMLElement && !child.classList.contains('semantic-toolbar')) return child
+  }
+  return undefined
 }
 
 function play(element: HTMLElement, keyframes: Keyframe[], duration: number) {
