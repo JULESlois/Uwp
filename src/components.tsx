@@ -1,8 +1,9 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
+import { CommandIcon, commandIconFromGlyph, type CommandIconName } from './command-icons'
 
 export type NavItem<T extends string> = { key: T; glyph: string; label: string }
 export type PaneMode = 'auto' | 'compact' | 'expanded'
-export type Command = { label: string; glyph: string; onClick?: () => void; primary?: boolean; disabled?: boolean }
+export type Command = { label: string; glyph?: string; icon?: CommandIconName; onClick?: () => void; primary?: boolean; disabled?: boolean }
 export type ListItem = { key: string; title: string; detail?: string; glyph?: string; disabled?: boolean }
 
 function enabledElements(root: HTMLElement | null, selector: string) {
@@ -39,6 +40,11 @@ function toolbarKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
   if (event.key === 'End') { event.preventDefault(); focusEdge(event.currentTarget, selector, 'end') }
 }
 
+function CommandVisual({ command, className = 'command-icon-slot' }: { command: Pick<Command, 'glyph' | 'icon'>; className?: string }) {
+  const icon = command.icon ?? commandIconFromGlyph(command.glyph)
+  return <span className={className} aria-hidden="true">{icon ? <CommandIcon name={icon} /> : <span className="command-icon-fallback">{command.glyph}</span>}</span>
+}
+
 export function CommandBar({ commands }: { commands: Command[] }) {
   const host = useRef<HTMLDivElement>(null)
   const overflowTrigger = useRef<HTMLButtonElement>(null)
@@ -68,11 +74,11 @@ export function CommandBar({ commands }: { commands: Command[] }) {
   const overflow = commands.slice(visibleCount)
   const closeOverflow = () => { setOverflowOpen(false); requestAnimationFrame(() => overflowTrigger.current?.focus()) }
 
-  return <div ref={host} className="commandbar" role="toolbar" aria-label="命令栏" onKeyDown={toolbarKeyDown}>{shown.map((command) => <button data-roving="true" key={command.label} disabled={command.disabled} className={command.primary ? 'primary' : ''} onClick={command.onClick}><span aria-hidden="true">{command.glyph}</span><b>{command.label}</b></button>)}{overflow.length > 0 && <span className="command-overflow-host"><button ref={overflowTrigger} data-roving="true" className="command-overflow-trigger" aria-haspopup="menu" aria-expanded={overflowOpen} aria-label="更多命令" onClick={() => setOverflowOpen((value) => !value)}><span aria-hidden="true">•••</span><b>更多</b></button>{overflowOpen && <><button className="command-overflow-scrim" aria-label="关闭更多命令" onClick={() => setOverflowOpen(false)} /><div ref={overflowMenu} className="command-overflow-menu" role="menu" onKeyDown={(event) => menuKeyDown(event, closeOverflow)}>{overflow.map((command) => <button key={command.label} role="menuitem" disabled={command.disabled} onClick={() => { command.onClick?.(); setOverflowOpen(false) }}><span aria-hidden="true">{command.glyph}</span><b>{command.label}</b></button>)}</div></>}</span>}</div>
+  return <div ref={host} className="commandbar" role="toolbar" aria-label="命令栏" onKeyDown={toolbarKeyDown}>{shown.map((command) => <button data-roving="true" key={command.label} disabled={command.disabled} className={command.primary ? 'primary' : ''} onClick={command.onClick}><CommandVisual command={command} /><b>{command.label}</b></button>)}{overflow.length > 0 && <span className="command-overflow-host"><button ref={overflowTrigger} data-roving="true" className="command-overflow-trigger" aria-haspopup="menu" aria-expanded={overflowOpen} aria-label="更多命令" onClick={() => setOverflowOpen((value) => !value)}><span className="command-icon-slot" aria-hidden="true"><CommandIcon name="more" /></span><b>更多</b></button>{overflowOpen && <><button className="command-overflow-scrim" aria-label="关闭更多命令" onClick={() => setOverflowOpen(false)} /><div ref={overflowMenu} className="command-overflow-menu" role="menu" onKeyDown={(event) => menuKeyDown(event, closeOverflow)}>{overflow.map((command) => <button key={command.label} role="menuitem" disabled={command.disabled} onClick={() => { command.onClick?.(); setOverflowOpen(false) }}><CommandVisual command={command} /><b>{command.label}</b></button>)}</div></>}</span>}</div>
 }
 
 export function AppBar({ commands, className = '' }: { commands: Command[]; className?: string }) {
-  return <div className={`appbar ${className}`.trim()} role="toolbar" aria-label="应用栏" onKeyDown={toolbarKeyDown}>{commands.map((command, index) => <button data-roving="true" tabIndex={index === 0 ? 0 : -1} key={command.label} disabled={command.disabled} onClick={command.onClick}><span aria-hidden="true">{command.glyph}</span><b>{command.label}</b></button>)}</div>
+  return <div className={`appbar ${className}`.trim()} role="toolbar" aria-label="应用栏" onKeyDown={toolbarKeyDown}>{commands.map((command, index) => <button data-roving="true" tabIndex={index === 0 ? 0 : -1} key={command.label} disabled={command.disabled} onClick={command.onClick}><CommandVisual command={command} className="appbar-icon" /><b>{command.label}</b></button>)}</div>
 }
 
 export function EdgeAppBar({ open, onOpen, onClose, commands }: { open: boolean; onOpen: () => void; onClose: () => void; commands: Command[] }) {
@@ -109,7 +115,7 @@ export function AutoSuggestBox({ value, onChange, suggestions, placeholder = '�
   const matches = suggestions.filter((item) => item.toLowerCase().includes(value.toLowerCase())).slice(0, 5)
   const choose = (item: string) => { onChange(item); setOpen(false); setActiveIndex(0) }
   const optionId = (index: number) => `${listId}-option-${index}`
-  return <div className={`autosuggest${disabled ? ' disabled' : ''}`}><span className="autosuggest-input"><span aria-hidden="true">⌕</span><input value={value} disabled={disabled} placeholder={placeholder} aria-autocomplete="list" aria-expanded={!disabled && open && matches.length > 0} aria-controls={listId} aria-activedescendant={!disabled && open && matches[activeIndex] ? optionId(activeIndex) : undefined} onFocus={() => setOpen(true)} onChange={(event) => { onChange(event.target.value); setOpen(true); setActiveIndex(0) }} onKeyDown={(event) => { if (event.key === 'ArrowDown' && matches.length) { event.preventDefault(); setOpen(true); setActiveIndex((index) => (index + 1) % matches.length) } if (event.key === 'ArrowUp' && matches.length) { event.preventDefault(); setOpen(true); setActiveIndex((index) => (index - 1 + matches.length) % matches.length) } if (event.key === 'Enter' && open && matches[activeIndex]) { event.preventDefault(); choose(matches[activeIndex]!) } if (event.key === 'Escape') { setOpen(false); setActiveIndex(0) } }} /></span>{!disabled && open && value && matches.length > 0 && <div id={listId} className="autosuggest-menu" role="listbox">{matches.map((item, index) => <button id={optionId(index)} className={index === activeIndex ? 'active' : ''} key={item} role="option" aria-selected={index === activeIndex} tabIndex={-1} onMouseDown={(event) => event.preventDefault()} onMouseEnter={() => setActiveIndex(index)} onClick={() => choose(item)}>{item}</button>)}</div>}</div>
+  return <div className={`autosuggest${disabled ? ' disabled' : ''}`}><span className="autosuggest-input"><span className="autosuggest-command-icon" aria-hidden="true"><CommandIcon name="search" /></span><input value={value} disabled={disabled} placeholder={placeholder} aria-autocomplete="list" aria-expanded={!disabled && open && matches.length > 0} aria-controls={listId} aria-activedescendant={!disabled && open && matches[activeIndex] ? optionId(activeIndex) : undefined} onFocus={() => setOpen(true)} onChange={(event) => { onChange(event.target.value); setOpen(true); setActiveIndex(0) }} onKeyDown={(event) => { if (event.key === 'ArrowDown' && matches.length) { event.preventDefault(); setOpen(true); setActiveIndex((index) => (index + 1) % matches.length) } if (event.key === 'ArrowUp' && matches.length) { event.preventDefault(); setOpen(true); setActiveIndex((index) => (index - 1 + matches.length) % matches.length) } if (event.key === 'Enter' && open && matches[activeIndex]) { event.preventDefault(); choose(matches[activeIndex]!) } if (event.key === 'Escape') { setOpen(false); setActiveIndex(0) } }} /></span>{!disabled && open && value && matches.length > 0 && <div id={listId} className="autosuggest-menu" role="listbox">{matches.map((item, index) => <button id={optionId(index)} className={index === activeIndex ? 'active' : ''} key={item} role="option" aria-selected={index === activeIndex} tabIndex={-1} onMouseDown={(event) => event.preventDefault()} onMouseEnter={() => setActiveIndex(index)} onClick={() => choose(item)}>{item}</button>)}</div>}</div>
 }
 
 export function Flyout({ open, onClose, anchor, children }: { open: boolean; onClose: () => void; anchor: ReactNode; children: ReactNode }) {
@@ -150,7 +156,7 @@ export function ContentDialog({ open, title, children, onClose }: { open: boolea
 
 export function SettingsPane({ open, title, onClose, children }: { open: boolean; title: string; onClose: () => void; children: ReactNode }) {
   if (!open) return null
-  return <div className="settings-layer"><button className="settings-scrim" aria-label="关闭设置面板" onClick={onClose} /><aside className="settings-pane" aria-label={title} onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); onClose() } }}><header><button onClick={onClose} aria-label="返回">←</button><h2>{title}</h2></header>{children}</aside></div>
+  return <div className="settings-layer"><button className="settings-scrim" aria-label="关闭设置面板" onClick={onClose} /><aside className="settings-pane" aria-label={title} onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); onClose() } }}><header><button className="settings-pane-back" onClick={onClose} aria-label="返回"><span className="settings-back-icon" aria-hidden="true"><CommandIcon name="back" /></span></button><h2>{title}</h2></header>{children}</aside></div>
 }
 
 export function ContextMenu({ children, items }: { children: ReactNode; items: Array<{ label: string; onClick?: () => void; disabled?: boolean }> }) {
@@ -191,12 +197,12 @@ export function AcrylicPane({ children }: { children: ReactNode }) {
 }
 
 export function TeachingTip({ open, title, children, anchor, onClose }: { open: boolean; title: string; children: ReactNode; anchor: ReactNode; onClose: () => void }) {
-  return <span className="teaching-anchor">{anchor}{open && <div className="teaching-tip" role="status"><button className="teaching-close" aria-label="关闭提示" onClick={onClose}>×</button><strong>{title}</strong><div>{children}</div></div>}</span>
+  return <span className="teaching-anchor">{anchor}{open && <div className="teaching-tip" role="status"><button className="teaching-close" aria-label="关闭提示" onClick={onClose}><span className="teaching-close-icon" aria-hidden="true"><CommandIcon name="close" /></span></button><strong>{title}</strong><div>{children}</div></div>}</span>
 }
 
 export function CharmBar({ open, onOpen, onClose, onSelect }: { open: boolean; onOpen: () => void; onClose: () => void; onSelect: (command: string) => void }) {
-  const commands = [{ key: 'search', glyph: '⌕', label: '搜索' }, { key: 'share', glyph: '↗', label: '共享' }, { key: 'start', glyph: '⊞', label: '开始' }, { key: 'devices', glyph: '▣', label: '设备' }, { key: 'settings', glyph: '⚙', label: '设置' }]
-  return <><button className="edge-gesture" aria-label="打开超级按钮" onPointerEnter={onOpen} onClick={onOpen} /><aside className={`charm-bar${open ? ' open' : ''}`} aria-hidden={!open} onPointerLeave={onClose} onKeyDown={(event) => menuKeyDown(event, onClose)}>{commands.map((command, index) => <button key={command.key} tabIndex={open && index === 0 ? 0 : -1} onClick={() => onSelect(command.key)}><span aria-hidden="true">{command.glyph}</span><b>{command.label}</b></button>)}</aside></>
+  const commands: Array<{ key: string; icon: CommandIconName; label: string }> = [{ key: 'search', icon: 'search', label: '搜索' }, { key: 'share', icon: 'share', label: '共享' }, { key: 'start', icon: 'start', label: '开始' }, { key: 'devices', icon: 'devices', label: '设备' }, { key: 'settings', icon: 'settings', label: '设置' }]
+  return <><button className="edge-gesture" aria-label="打开超级按钮" onPointerEnter={onOpen} onClick={onOpen} /><aside className={`charm-bar${open ? ' open' : ''}`} aria-hidden={!open} onPointerLeave={onClose} onKeyDown={(event) => menuKeyDown(event, onClose)}>{commands.map((command, index) => <button key={command.key} tabIndex={open && index === 0 ? 0 : -1} onClick={() => onSelect(command.key)}><span className="charm-icon" aria-hidden="true"><CommandIcon name={command.icon} /></span><b>{command.label}</b></button>)}</aside></>
 }
 
 export function SnapView({ snapped, onChange }: { snapped: boolean; onChange: (value: boolean) => void }) {
