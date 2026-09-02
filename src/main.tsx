@@ -13,6 +13,7 @@ import './navigation-icons.css'
 import './era-hierarchy.css'
 import './navigation-modes.css'
 import './motion-system.css'
+import './directional-motion.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
