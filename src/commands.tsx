@@ -107,7 +107,7 @@ export function PriorityCommandBar({ commands }: { commands: PriorityCommand[] }
     <div className="priority-commandbar" role="toolbar" aria-label="命令栏" onKeyDown={focusToolbar}>
       {shown.map((command) => <button data-roving="true" key={command.label} className="priority-command-action" disabled={command.disabled} onClick={command.onClick}><CommandGlyph command={command} /><b>{command.label}</b></button>)}
       {overflow.length > 0 && <span className="priority-command-overflow-host">
-        <button ref={overflowTrigger} data-roving="true" className="priority-command-more" aria-label="更多命令" aria-haspopup="menu" aria-expanded={overflowOpen} onClick={() => setOverflowOpen((value) => !value}><span className="priority-command-icon" aria-hidden="true"><CommandIcon name="more" /></span></button>
+        <button ref={overflowTrigger} data-roving="true" className="priority-command-more" aria-label="更多命令" aria-haspopup="menu" aria-expanded={overflowOpen} onClick={() => setOverflowOpen((value) => !value)}><span className="priority-command-icon" aria-hidden="true"><CommandIcon name="more" /></span></button>
         {overflowOpen && <><button className="priority-command-scrim" aria-label="关闭更多命令" onClick={closeOverflow} /><div ref={overflowMenu} className="priority-command-overflow" role="menu" onKeyDown={(event) => focusOverflow(event, closeOverflow)}>{overflow.map((command) => <button key={command.label} role="menuitem" disabled={command.disabled} onClick={() => { command.onClick?.(); setOverflowOpen(false) }}><CommandGlyph command={command} /><b>{command.label}</b></button>)}</div></>}
       </span>}
     </div>
