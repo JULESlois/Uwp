@@ -6,7 +6,9 @@
   transition:background-color var(--motion-panel) var(--ease-standard),color var(--motion-state) linear;
 }
 .shell{
-  transition:padding-left var(--motion-panel) var(--ease-enter),padding-top var(--motion-panel) var(--ease-enter);
+  /* Navigation display-mode geometry is coordinated by layout-motion.ts. A
+     padding transition here would animate the same movement twice. */
+  transition:none;
 }
 
 /* Page and in-page content switching. */
