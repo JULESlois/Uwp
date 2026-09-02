@@ -1,0 +1,96 @@
+/* Direction-aware navigation motion.
+   UWP uses restrained continuity; Windows 8 keeps a stronger horizontal Metro reading direction. */
+
+.page-title-transition{
+  animation-duration:var(--motion-panel);
+  animation-timing-function:var(--ease-enter);
+  animation-fill-mode:both;
+  will-change:opacity,transform;
+}
+
+.win10[data-nav-direction="forward"] .page-enter{animation-name:uwp-page-forward-in}
+.win10[data-nav-direction="backward"] .page-enter{animation-name:uwp-page-backward-in}
+.win10[data-nav-direction="neutral"] .page-enter{animation-name:uwp-page-neutral-in}
+.win10[data-nav-direction="forward"] .page-title-transition{animation-name:uwp-title-forward-in}
+.win10[data-nav-direction="backward"] .page-title-transition{animation-name:uwp-title-backward-in}
+.win10[data-nav-direction="neutral"] .page-title-transition{animation-name:uwp-title-neutral-in}
+
+@keyframes uwp-page-forward-in{
+  from{opacity:0;transform:translate3d(14px,0,0)}
+  to{opacity:1;transform:none}
+}
+@keyframes uwp-page-backward-in{
+  from{opacity:0;transform:translate3d(-10px,0,0)}
+  to{opacity:1;transform:none}
+}
+@keyframes uwp-page-neutral-in{
+  from{opacity:0;transform:translate3d(0,6px,0)}
+  to{opacity:1;transform:none}
+}
+@keyframes uwp-title-forward-in{
+  from{opacity:.28;transform:translate3d(8px,0,0)}
+  to{opacity:1;transform:none}
+}
+@keyframes uwp-title-backward-in{
+  from{opacity:.28;transform:translate3d(-7px,0,0)}
+  to{opacity:1;transform:none}
+}
+@keyframes uwp-title-neutral-in{
+  from{opacity:.35;transform:translate3d(0,4px,0)}
+  to{opacity:1;transform:none}
+}
+
+/* Metro page changes are more obviously horizontal, but stay far below a full-screen slide. */
+.win8[data-nav-direction="forward"] .page-enter{animation-name:metro-page-forward-in}
+.win8[data-nav-direction="backward"] .page-enter{animation-name:metro-page-backward-in}
+.win8[data-nav-direction="neutral"] .page-enter{animation-name:metro-page-neutral-in}
+.win8[data-nav-direction="forward"] .page-title-transition{animation-name:metro-title-forward-in}
+.win8[data-nav-direction="backward"] .page-title-transition{animation-name:metro-title-backward-in}
+.win8[data-nav-direction="neutral"] .page-title-transition{animation-name:metro-title-neutral-in}
+
+/* In Metro, hierarchy is produced by horizontal continuity; do not add a second vertical drift. */
+.win8 .page-enter>.section-head,
+.win8 .page-enter>.hero{
+  animation-name:metro-content-reveal;
+}
+
+@keyframes metro-page-forward-in{
+  from{opacity:.12;transform:translate3d(34px,0,0)}
+  to{opacity:1;transform:none}
+}
+@keyframes metro-page-backward-in{
+  from{opacity:.12;transform:translate3d(-28px,0,0)}
+  to{opacity:1;transform:none}
+}
+@keyframes metro-page-neutral-in{
+  from{opacity:0;transform:translate3d(18px,0,0)}
+  to{opacity:1;transform:none}
+}
+@keyframes metro-title-forward-in{
+  from{opacity:.18;transform:translate3d(22px,0,0)}
+  to{opacity:1;transform:none}
+}
+@keyframes metro-title-backward-in{
+  from{opacity:.18;transform:translate3d(-18px,0,0)}
+  to{opacity:1;transform:none}
+}
+@keyframes metro-title-neutral-in{
+  from{opacity:.22;transform:translate3d(12px,0,0)}
+  to{opacity:1;transform:none}
+}
+@keyframes metro-content-reveal{
+  from{opacity:0}
+  to{opacity:1}
+}
+
+/* Era switching changes shell composition, not page position. Keep its chrome entrance local. */
+.win10 .commandbar{
+  animation:uwp-command-shell-in var(--motion-panel) var(--ease-enter) both;
+}
+@keyframes uwp-command-shell-in{
+  from{opacity:0;transform:translate3d(0,-5px,0)}
+  to{opacity:1;transform:none}
+}
+
+.no-motion .page-title-transition{animation:none!important}
+@media(prefers-reduced-motion:reduce){.page-title-transition{animation:none!important}}
