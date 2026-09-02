@@ -2,14 +2,17 @@ export {}
 
 type Rect = { left: number; top: number; width: number; height: number }
 type Snapshot = Map<string, Rect>
-type ActiveDrag = { sourceId: string; rects: Map<string, Rect>; expiresAt: number }
+type ActiveDrag = { sourceId: string; keys: string[]; rects: Map<string, Rect>; adopted: Set<string>; expiresAt: number }
 
 const snapshots = new WeakMap<HTMLElement, Snapshot>()
 const activeAnimations = new WeakMap<HTMLElement, Animation>()
 const resizeObservers = new WeakMap<HTMLElement, ResizeObserver>()
+const runtimeKeys = new WeakMap<HTMLElement, string>()
 const trackedViews = new Set<HTMLElement>()
+let runtimeSequence = 0
 let activeDrag: ActiveDrag | null = null
 
+const COLLECTION_MIME = 'application/x-uwp-collection'
 const SETTLE_MS = 180
 const DIRECT_MS = 130
 const CONNECTED_MS = 220
@@ -19,8 +22,38 @@ function directItems(view: HTMLElement) {
   return Array.from(view.children).filter((child): child is HTMLElement => child instanceof HTMLElement && child.classList.contains('collection-item'))
 }
 
+function explicitIdentity(item: HTMLElement) {
+  const key = item.dataset.collectionKey?.trim()
+  return key ? `item:${key}` : null
+}
+
 function identity(item: HTMLElement) {
-  return item.dataset.collectionKey?.trim() || null
+  const explicit = explicitIdentity(item)
+  if (explicit) return explicit
+  const existing = runtimeKeys.get(item)
+  if (existing) return existing
+  const generated = `node:${++runtimeSequence}`
+  runtimeKeys.set(item, generated)
+  return generated
+}
+
+function assignItemIdentity(item: HTMLElement, key: string) {
+  const identityKey = `item:${key}`
+  runtimeKeys.set(item, identityKey)
+  return identityKey
+}
+
+function parseTransfer(dataTransfer: DataTransfer) {
+  const raw = dataTransfer.getData(COLLECTION_MIME) || dataTransfer.getData('text/plain')
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw) as { sourceId?: unknown; keys?: unknown }
+    if (!parsed || typeof parsed.sourceId !== 'string' || !Array.isArray(parsed.keys)) return null
+    const keys = parsed.keys.filter((key): key is string => typeof key === 'string' && key.length > 0)
+    return keys.length ? { sourceId: parsed.sourceId, keys } : null
+  } catch {
+    return null
+  }
 }
 
 function relativeRect(view: HTMLElement, item: HTMLElement): Rect {
@@ -41,10 +74,7 @@ function viewportRect(item: HTMLElement): Rect {
 
 function measure(view: HTMLElement): Snapshot {
   const result = new Map<string, Rect>()
-  for (const item of directItems(view)) {
-    const key = identity(item)
-    if (key) result.set(key, relativeRect(view, item))
-  }
+  for (const item of directItems(view)) result.set(identity(item), relativeRect(view, item))
   return result
 }
 
@@ -68,8 +98,6 @@ function play(item: HTMLElement, keyframes: Keyframe[], duration: number) {
 function animateView(view: HTMLElement) {
   if (!view.isConnected) return
 
-  // Cancel only animations owned by this coordinator before measuring layout;
-  // CSS swipe/selection feedback lives on different elements and is untouched.
   for (const item of directItems(view)) activeAnimations.get(item)?.cancel()
 
   const before = snapshots.get(view)
@@ -85,7 +113,6 @@ function animateView(view: HTMLElement) {
 
   for (const item of directItems(view)) {
     const key = identity(item)
-    if (!key) continue
     const current = after.get(key)
     if (!current) continue
 
@@ -104,8 +131,6 @@ function animateView(view: HTMLElement) {
       continue
     }
 
-    // A key that appears in another collection can continue from its drag origin.
-    // Very long moves degrade into a short reveal instead of flying across the app.
     const origin = drag?.sourceId !== sourceId ? drag?.rects.get(key) : undefined
     if (!origin) continue
     const target = viewportRect(item)
@@ -152,6 +177,35 @@ function collectionForNode(node: Node) {
   return (node.matches('.collection-view') ? node : node.closest('.collection-view')) as HTMLElement | null
 }
 
+function directAddedItems(node: Node, view: HTMLElement) {
+  if (!(node instanceof HTMLElement)) return [] as HTMLElement[]
+  const result: HTMLElement[] = []
+  if (node.parentElement === view && node.classList.contains('collection-item')) result.push(node)
+  node.querySelectorAll<HTMLElement>('.collection-item').forEach((item) => {
+    if (item.parentElement === view) result.push(item)
+  })
+  return result
+}
+
+function adoptCrossViewItems(view: HTMLElement, nodes: NodeList) {
+  const drag = activeDrag
+  const sourceId = view.dataset.collectionId ?? ''
+  if (!drag || !sourceId || sourceId === drag.sourceId) return
+
+  const added: HTMLElement[] = []
+  nodes.forEach((node) => added.push(...directAddedItems(node, view)))
+  if (!added.length) return
+
+  const pending = drag.keys.filter((key) => !drag.adopted.has(key))
+  for (let index = 0; index < added.length && index < pending.length; index += 1) {
+    const key = pending[index]
+    const item = added[index]
+    if (!key || !item) continue
+    assignItemIdentity(item, key)
+    drag.adopted.add(key)
+  }
+}
+
 function install() {
   document.querySelectorAll<HTMLElement>('.collection-view').forEach(register)
 
@@ -160,7 +214,10 @@ function install() {
 
     for (const record of records) {
       const host = collectionForNode(record.target)
-      if (host) changed.add(host)
+      if (host) {
+        adoptCrossViewItems(host, record.addedNodes)
+        changed.add(host)
+      }
 
       record.addedNodes.forEach((node) => {
         if (!(node instanceof Element)) return
@@ -186,20 +243,28 @@ function install() {
   document.addEventListener('dragstart', (event) => {
     const target = event.target instanceof Element ? event.target.closest<HTMLElement>('.collection-item') : null
     const view = target?.closest<HTMLElement>('.collection-view')
-    if (!target || !view) return
+    if (!target || !view || !event.dataTransfer) return
 
+    const payload = parseTransfer(event.dataTransfer)
     const candidates = target.classList.contains('selected')
       ? directItems(view).filter((item) => item.classList.contains('selected') && !item.classList.contains('disabled'))
       : [target]
+    const payloadKeys = payload?.sourceId === (view.dataset.collectionId ?? '') ? payload.keys : []
     const rects = new Map<string, Rect>()
-    candidates.forEach((item) => {
-      const key = identity(item)
-      if (key) rects.set(key, viewportRect(item))
+    const keys: string[] = []
+
+    candidates.forEach((item, index) => {
+      const itemKey = payloadKeys[index]
+      const key = itemKey ? assignItemIdentity(item, itemKey) : identity(item)
+      rects.set(key, viewportRect(item))
+      if (itemKey) keys.push(itemKey)
     })
-    if (!rects.size) return
+
     activeDrag = {
       sourceId: view.dataset.collectionId ?? '',
+      keys,
       rects,
+      adopted: new Set<string>(),
       expiresAt: performance.now() + 1600,
     }
   }, true)
