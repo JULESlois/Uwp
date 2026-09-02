@@ -9,6 +9,8 @@ import './refinements.css'
 import './lifecycle.css'
 import './navigation-shell.css'
 import './command-icons.css'
+import './navigation-icons.css'
+import './era-hierarchy.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
