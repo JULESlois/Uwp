@@ -1,0 +1,73 @@
+/* Navigation glyphs use one fixed 18px SVG geometry instead of font-dependent Unicode sizing. */
+:root{
+  --nav-icon-home:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.3 9.1 10 3.35l6.7 5.75'/%3E%3Cpath d='M5.1 8.2v8.15h9.8V8.2M8.1 16.35v-4.7h3.8v4.7'/%3E%3C/svg%3E");
+  --nav-icon-controls:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round'%3E%3Cpath d='M3.3 5.2h5M11.7 5.2h5M3.3 10h9M15.1 10h1.6M3.3 14.8h2.1M8.8 14.8h7.9'/%3E%3Ccircle cx='10.1' cy='5.2' r='1.25'/%3E%3Ccircle cx='13.75' cy='10' r='1.25'/%3E%3Ccircle cx='7.1' cy='14.8' r='1.25'/%3E%3C/svg%3E");
+  --nav-icon-views:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.6' stroke-linejoin='round'%3E%3Crect x='3.2' y='3.7' width='4.1' height='4.1'/%3E%3Crect x='3.2' y='12.2' width='4.1' height='4.1'/%3E%3Cpath d='M9.7 5.75h7.1M9.7 14.25h7.1'/%3E%3C/svg%3E");
+  --nav-icon-patterns:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.6' stroke-linejoin='round'%3E%3Crect x='3.3' y='3.3' width='5.2' height='5.2'/%3E%3Crect x='11.5' y='3.3' width='5.2' height='5.2'/%3E%3Crect x='3.3' y='11.5' width='5.2' height='5.2'/%3E%3Cpath d='M11.5 11.5h5.2v5.2h-5.2z'/%3E%3C/svg%3E");
+  --nav-icon-settings:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round'%3E%3Ccircle cx='10' cy='10' r='2.35'/%3E%3Cpath d='M10 2.9v1.6M10 15.5v1.6M17.1 10h-1.6M4.5 10H2.9M15.02 4.98l-1.14 1.14M6.12 13.88l-1.14 1.14M15.02 15.02l-1.14-1.14M6.12 6.12 4.98 4.98'/%3E%3C/svg%3E");
+  --nav-icon-menu:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.65' stroke-linecap='round'%3E%3Cpath d='M3.6 5.3h12.8M3.6 10h12.8M3.6 14.7h12.8'/%3E%3C/svg%3E");
+  --nav-icon-back:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9.2 4.3-5.7 5.7 5.7 5.7M3.8 10h12.7'/%3E%3C/svg%3E");
+  --nav-icon-more:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='black'%3E%3Ccircle cx='5' cy='10' r='1'/%3E%3Ccircle cx='10' cy='10' r='1'/%3E%3Ccircle cx='15' cy='10' r='1'/%3E%3C/svg%3E");
+}
+
+.navigation-pane-toggle>span,
+.side-nav-action>span,
+.top-nav-action>span,
+.top-nav-overflow button>span,
+.top-nav-measure [data-measure-item]>span,
+.overlay-rail nav button>span,
+.overlay-tree-action>span{
+  display:grid;
+  width:20px;
+  height:20px;
+  place-items:center;
+  font-size:0!important;
+  line-height:0;
+}
+.navigation-pane-toggle>span::before,
+.side-nav-action>span::before,
+.top-nav-action>span::before,
+.top-nav-overflow button>span::before,
+.top-nav-measure [data-measure-item]>span::before,
+.overlay-rail nav button>span::before,
+.overlay-tree-action>span::before,
+.navigation-back::before,
+.top-nav-more::before{
+  content:"";
+  display:block;
+  width:18px;
+  height:18px;
+  background:currentColor;
+  -webkit-mask:var(--nav-mask) center/contain no-repeat;
+  mask:var(--nav-mask) center/contain no-repeat;
+}
+.navigation-pane-toggle>span::before{--nav-mask:var(--nav-icon-menu)}
+.navigation-back{font-size:0!important}.navigation-back::before{--nav-mask:var(--nav-icon-back)}
+.top-nav-more{font-size:0!important}.top-nav-more::before{--nav-mask:var(--nav-icon-more)}
+
+.side-nav-action:nth-child(1)>span::before,
+.top-nav-measure [data-measure-item]:nth-child(1)>span::before,
+[data-nav-key="start"]>span::before{--nav-mask:var(--nav-icon-home)}
+.side-nav-action:nth-child(2)>span::before,
+.top-nav-measure [data-measure-item]:nth-child(2)>span::before,
+[data-nav-key="controls"]>span::before{--nav-mask:var(--nav-icon-controls)}
+.side-nav-action:nth-child(3)>span::before,
+.top-nav-measure [data-measure-item]:nth-child(3)>span::before,
+[data-nav-key="views"]>span::before{--nav-mask:var(--nav-icon-views)}
+.side-nav-action:nth-child(4)>span::before,
+.top-nav-measure [data-measure-item]:nth-child(4)>span::before,
+[data-nav-key="patterns"]>span::before{--nav-mask:var(--nav-icon-patterns)}
+.side-nav-action:nth-child(5)>span::before,
+.top-nav-measure [data-measure-item]:nth-child(5)>span::before,
+[data-nav-key="settings"]>span::before{--nav-mask:var(--nav-icon-settings)}
+.overlay-tree-action[data-node-id="group-features"]>span::before{--nav-mask:var(--nav-icon-patterns)}
+
+/* Disclosure marks are geometry too; avoid font-specific chevrons. */
+.overlay-enter,.overlay-disclosure>span{font-size:0!important}
+.overlay-enter{width:8px;height:8px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg)}
+.overlay-disclosure>span{display:block;width:8px;height:8px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:translateY(-2px) rotate(45deg)}
+
+@media(forced-colors:active){
+  .navigation-pane-toggle>span::before,.side-nav-action>span::before,.top-nav-action>span::before,.top-nav-overflow button>span::before,.overlay-rail nav button>span::before,.overlay-tree-action>span::before,.navigation-back::before,.top-nav-more::before{background:ButtonText}
+  .side-nav-action.active>span::before,.top-nav-action.active>span::before,.overlay-rail nav button.active>span::before,.overlay-tree-node.active .overlay-tree-action>span::before{background:HighlightText}
+}
