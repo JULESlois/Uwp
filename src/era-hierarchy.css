@@ -1,0 +1,63 @@
+/* Windows 8 separates page and section hierarchy with type scale and whitespace,
+   rather than borrowing Windows 10's persistent command chrome. */
+.win8 .topbar{
+  margin-bottom:52px;
+}
+.win8 .topbar h1{
+  font-size:clamp(64px,7vw,96px);
+  font-weight:200;
+  line-height:.9;
+  letter-spacing:-.05em;
+}
+.win8 .page-enter>.section-head:first-child,
+.win8 .page-enter>.hero.simple:first-child{
+  max-width:960px;
+  margin-bottom:42px;
+}
+.win8 .page-enter>.section-head:first-child h2,
+.win8 .page-enter>.hero.simple:first-child h2{
+  margin-bottom:18px;
+  font-size:clamp(30px,3.25vw,44px);
+  font-weight:300;
+  line-height:1.08;
+  letter-spacing:-.025em;
+}
+.win8 .page-enter>.section-head:first-child>p:last-child,
+.win8 .page-enter>.hero.simple:first-child .lead{
+  max-width:900px;
+  font-size:15px;
+  line-height:1.7;
+}
+.win8 .settings-page>.section-head:first-child{
+  margin-bottom:36px;
+}
+.win8 .settings-stack{
+  max-width:1100px;
+}
+
+/* The era switch belongs to the page title band, but it must not compete with it. */
+.win8 .topbar .era-switch{
+  margin-top:4px;
+  align-self:flex-start;
+}
+
+@media(max-width:700px){
+  .win8 .topbar{
+    margin-bottom:34px;
+  }
+  .win8 .topbar h1{
+    font-size:clamp(54px,13vw,72px);
+  }
+  .win8 .page-enter>.section-head:first-child,
+  .win8 .page-enter>.hero.simple:first-child{
+    margin-bottom:30px;
+  }
+  .win8 .page-enter>.section-head:first-child h2,
+  .win8 .page-enter>.hero.simple:first-child h2{
+    font-size:clamp(28px,8vw,36px);
+  }
+  .win8 .page-enter>.section-head:first-child>p:last-child,
+  .win8 .page-enter>.hero.simple:first-child .lead{
+    font-size:14px;
+  }
+}
