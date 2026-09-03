@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import type { Command } from './components'
 import { CommandIcon, commandIconFromGlyph, type CommandIconName } from './command-icons'
 
@@ -51,53 +51,65 @@ function CommandGlyph({ command }: { command: PriorityCommand }) {
 }
 
 export function PriorityCommandBar({ commands }: { commands: PriorityCommand[] }) {
-  const ranked = [...commands.filter((command) => command.priority !== 'secondary'), ...commands.filter((command) => command.priority === 'secondary')]
   const host = useRef<HTMLDivElement>(null)
   const overflowTrigger = useRef<HTMLButtonElement>(null)
   const overflowMenu = useRef<HTMLDivElement>(null)
-  const [visibleCount, setVisibleCount] = useState(ranked.length)
+  const [visibleIndices, setVisibleIndices] = useState<number[]>(() => commands.map((_, index) => index))
   const [overflowOpen, setOverflowOpen] = useState(false)
-  const signature = ranked.map((command) => `${command.label}:${command.disabled ? 1 : 0}`).join('|')
+  const signature = commands.map((command) => `${command.label}:${command.disabled ? 1 : 0}:${command.priority ?? 'primary'}:${command.icon ?? ''}:${command.glyph ?? ''}`).join('|')
 
   useEffect(() => {
     const root = host.current
     if (!root) return
     const measure = () => {
       const widths = Array.from(root.querySelectorAll<HTMLElement>('[data-command-measure]')).map((item) => item.offsetWidth)
+      const allIndices = commands.map((_, index) => index)
       const total = widths.reduce((sum, width) => sum + width, 0)
       const available = root.clientWidth
       if (!widths.length || total <= available) {
-        setVisibleCount(ranked.length)
+        setVisibleIndices(allIndices)
         return
       }
+
       const overflowReserve = 52
-      let used = 0
-      let count = 0
-      for (const width of widths) {
-        if (used + width > Math.max(0, available - overflowReserve)) break
-        used += width
-        count += 1
+      const budget = Math.max(0, available - overflowReserve)
+      const visible = new Set(allIndices)
+      let used = total
+
+      const removeUntilFit = (indices: number[]) => {
+        for (const index of indices) {
+          if (used <= budget || visible.size <= 1) break
+          if (!visible.has(index)) continue
+          visible.delete(index)
+          used -= widths[index] ?? 0
+        }
       }
-      setVisibleCount(Math.max(1, count))
+
+      removeUntilFit(allIndices.filter((index) => commands[index]?.priority === 'secondary').reverse())
+      removeUntilFit(allIndices.filter((index) => visible.has(index)).reverse())
+      setVisibleIndices(allIndices.filter((index) => visible.has(index)))
     }
+
     measure()
     if (typeof ResizeObserver === 'undefined') return
     const observer = new ResizeObserver(measure)
     observer.observe(root)
     return () => observer.disconnect()
-  }, [ranked.length, signature])
+  }, [commands.length, signature])
 
   useEffect(() => {
     if (!overflowOpen) return
     requestAnimationFrame(() => overflowMenu.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus())
   }, [overflowOpen])
 
-  useEffect(() => {
-    if (visibleCount >= ranked.length) setOverflowOpen(false)
-  }, [visibleCount, ranked.length])
+  const visibleSet = useMemo(() => new Set(visibleIndices), [visibleIndices])
+  const shown = commands.map((command, index) => ({ command, index })).filter(({ index }) => visibleSet.has(index))
+  const overflow = commands.map((command, index) => ({ command, index })).filter(({ index }) => !visibleSet.has(index))
 
-  const shown = ranked.slice(0, visibleCount)
-  const overflow = ranked.slice(visibleCount)
+  useEffect(() => {
+    if (!overflow.length) setOverflowOpen(false)
+  }, [overflow.length])
+
   const closeOverflow = () => {
     setOverflowOpen(false)
     requestAnimationFrame(() => overflowTrigger.current?.focus())
@@ -105,12 +117,12 @@ export function PriorityCommandBar({ commands }: { commands: PriorityCommand[] }
 
   return <div ref={host} className="priority-command-shell">
     <div className="priority-commandbar" role="toolbar" aria-label="命令栏" onKeyDown={focusToolbar}>
-      {shown.map((command) => <button data-roving="true" key={command.label} className="priority-command-action" disabled={command.disabled} onClick={command.onClick}><CommandGlyph command={command} /><b>{command.label}</b></button>)}
+      {shown.map(({ command, index }) => <button data-roving="true" key={`${command.label}-${index}`} className={`priority-command-action ${command.priority === 'secondary' ? 'secondary' : 'primary'}`} disabled={command.disabled} onClick={command.onClick}><CommandGlyph command={command} /><b>{command.label}</b></button>)}
       {overflow.length > 0 && <span className="priority-command-overflow-host">
         <button ref={overflowTrigger} data-roving="true" className="priority-command-more" aria-label="更多命令" aria-haspopup="menu" aria-expanded={overflowOpen} onClick={() => setOverflowOpen((value) => !value)}><span className="priority-command-icon" aria-hidden="true"><CommandIcon name="more" /></span></button>
-        {overflowOpen && <><button className="priority-command-scrim" aria-label="关闭更多命令" onClick={closeOverflow} /><div ref={overflowMenu} className="priority-command-overflow" role="menu" onKeyDown={(event) => focusOverflow(event, closeOverflow)}>{overflow.map((command) => <button key={command.label} role="menuitem" disabled={command.disabled} onClick={() => { command.onClick?.(); setOverflowOpen(false) }}><CommandGlyph command={command} /><b>{command.label}</b></button>)}</div></>}
+        {overflowOpen && <><button className="priority-command-scrim" aria-label="关闭更多命令" onClick={closeOverflow} /><div ref={overflowMenu} className="priority-command-overflow" role="menu" onKeyDown={(event) => focusOverflow(event, closeOverflow)}>{overflow.map(({ command, index }) => <button key={`${command.label}-${index}`} role="menuitem" disabled={command.disabled} onClick={() => { command.onClick?.(); setOverflowOpen(false) }}><CommandGlyph command={command} /><b>{command.label}</b></button>)}</div></>}
       </span>}
     </div>
-    <div className="priority-command-measure" aria-hidden="true">{ranked.map((command) => <span key={command.label} data-command-measure><CommandGlyph command={command} /><b>{command.label}</b></span>)}</div>
+    <div className="priority-command-measure" aria-hidden="true">{commands.map((command, index) => <span key={`${command.label}-${index}`} data-command-measure><CommandGlyph command={command} /><b>{command.label}</b></span>)}</div>
   </div>
 }
