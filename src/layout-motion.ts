@@ -11,6 +11,7 @@ const resizeObservers = new WeakMap<HTMLElement, ResizeObserver>()
 
 const DETAIL_MS = 160
 const LAYOUT_MS = 220
+const NAV_LAYOUT_MS = 180
 const EASE = 'cubic-bezier(.1,.9,.2,1)'
 const NAV_CONTINUITY_SELECTOR = '.shell > .topbar,.shell > .priority-command-shell,.shell > .page-transition-stage'
 const SURFACE_SELECTOR = [
@@ -28,6 +29,10 @@ function box(element: HTMLElement): Rect {
 
 function motionDisabled(element: HTMLElement) {
   return Boolean(element.closest('.no-motion')) || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+}
+
+function isNavigationContinuity(element: HTMLElement) {
+  return element.matches(NAV_CONTINUITY_SELECTOR)
 }
 
 function kindFor(element: HTMLElement): SurfaceKind {
@@ -64,7 +69,7 @@ function play(element: HTMLElement, keyframes: Keyframe[], duration: number) {
   })
 }
 
-function animateContinuity(element: HTMLElement, before: Rect, after: Rect) {
+function animateContinuity(element: HTMLElement, before: Rect, after: Rect, duration = LAYOUT_MS) {
   const dx = before.left - after.left
   const dy = before.top - after.top
   const distance = Math.hypot(dx, dy)
@@ -72,10 +77,19 @@ function animateContinuity(element: HTMLElement, before: Rect, after: Rect) {
   play(element, [
     { transform: `translate3d(${dx}px, ${dy}px, 0)` },
     { transform: 'translate3d(0, 0, 0)' },
-  ], LAYOUT_MS)
+  ], duration)
 }
 
-function animateSurface(element: HTMLElement) {
+function snapshotSurface(element: HTMLElement) {
+  if (!element.isConnected) return
+  activeAnimations.get(element)?.cancel()
+  activeAnimations.delete(element)
+  const kind = kindFor(element)
+  rects.set(element, box(element))
+  signatures.set(element, signature(element, kind))
+}
+
+function animateSurface(element: HTMLElement, continuityDuration = LAYOUT_MS) {
   if (!element.isConnected) return
   const kind = kindFor(element)
   const before = rects.get(element)
@@ -103,7 +117,7 @@ function animateSurface(element: HTMLElement) {
     ], DETAIL_MS)
   }
 
-  if (before) animateContinuity(element, before, after)
+  if (before) animateContinuity(element, before, after, continuityDuration)
 }
 
 function register(element: HTMLElement) {
@@ -111,18 +125,24 @@ function register(element: HTMLElement) {
   tracked.add(element)
   rects.set(element, box(element))
   signatures.set(element, signature(element, kindFor(element)))
-  if ('ResizeObserver' in window) {
-    const observer = new ResizeObserver(() => {
-      if (!element.isConnected) return
-      const previous = rects.get(element)
-      const next = box(element)
-      rects.set(element, next)
-      if (!previous || motionDisabled(element)) return
-      animateContinuity(element, previous, next)
-    })
-    observer.observe(element)
-    resizeObservers.set(element, observer)
-  }
+
+  // Navigation surfaces are intentionally excluded from ResizeObserver-driven
+  // continuity. Pane width and shell inset can change over several frames; feeding
+  // every frame back into FLIP would cancel/restart the same WAAPI animation and
+  // produce visible jitter. Navigation is animated only from discrete mode/pane
+  // state mutations below.
+  if (isNavigationContinuity(element)) return
+
+  const observer = new ResizeObserver(() => {
+    if (!element.isConnected) return
+    const previous = rects.get(element)
+    const next = box(element)
+    rects.set(element, next)
+    if (!previous || motionDisabled(element)) return
+    animateContinuity(element, previous, next)
+  })
+  observer.observe(element)
+  resizeObservers.set(element, observer)
 }
 
 function unregister(element: HTMLElement) {
@@ -142,14 +162,24 @@ function navigationSignature(className: string, resolvedNav = '') {
   return `${classes}|${resolvedNav}`
 }
 
+function navigationSurfaces(app: HTMLElement) {
+  const surfaces = Array.from(app.querySelectorAll<HTMLElement>(NAV_CONTINUITY_SELECTOR))
+  surfaces.forEach(register)
+  return surfaces
+}
+
+function animateNavigationSurfaces(app: HTMLElement) {
+  navigationSurfaces(app).forEach((surface) => animateSurface(surface, NAV_LAYOUT_MS))
+}
+
+function syncNavigationSurfaces(app: HTMLElement) {
+  navigationSurfaces(app).forEach(snapshotSurface)
+}
+
 function animateNavigationLayout(app: HTMLElement, previousSignature: string) {
   const currentSignature = navigationSignature(app.className, app.dataset.resolvedNav ?? '')
   if (previousSignature === currentSignature) return
-  const surfaces = Array.from(app.querySelectorAll<HTMLElement>(NAV_CONTINUITY_SELECTOR))
-  surfaces.forEach(register)
-  // MutationObserver runs before ResizeObserver delivery. Measure the new layout
-  // immediately so the old snapshot cannot be overwritten before FLIP begins.
-  surfaces.forEach(animateSurface)
+  animateNavigationSurfaces(app)
 }
 
 function relatedSurfaces(node: Node) {
@@ -180,6 +210,16 @@ function install() {
           } else if (record.attributeName === 'data-resolved-nav') {
             animateNavigationLayout(target, navigationSignature(target.className, record.oldValue ?? ''))
           }
+          continue
+        }
+
+        if (target instanceof HTMLElement && target.classList.contains('side-navigation') && record.attributeName === 'class') {
+          const app = target.closest<HTMLElement>('.app')
+          if (!app) continue
+          // Responsive/system restoration should establish the new geometry without
+          // impersonating a user transition. User open/close gets exactly one FLIP.
+          if (target.classList.contains('pane-change-system')) syncNavigationSurfaces(app)
+          else animateNavigationSurfaces(app)
         }
         continue
       }
