@@ -35,6 +35,38 @@
   to{opacity:1;transform:none}
 }
 
+/* React-owned menus unmount immediately. transient-lifecycle.ts reinserts an
+   inert visual copy for one frame so the same surface can complete a reverse
+   slide without keeping stale interactive state alive. */
+.command-overflow-menu[data-transient-exit="true"],
+.top-nav-overflow[data-transient-exit="true"],
+.autosuggest-menu[data-transient-exit="true"],
+.context-menu[data-transient-exit="true"]{
+  animation:none!important;
+  pointer-events:none!important;
+  user-select:none;
+}
+
+.command-overflow-menu.transient-exit-active,
+.top-nav-overflow.transient-exit-active,
+.autosuggest-menu.transient-exit-active{
+  animation:transient-slide-up-out 150ms var(--ease-uwp) both!important;
+}
+
+.context-menu.transient-exit-active{
+  animation:transient-context-out 150ms var(--ease-uwp) both!important;
+}
+
+@keyframes transient-slide-up-out{
+  from{opacity:1;transform:none}
+  to{opacity:.84;transform:translate3d(0,-10px,0)}
+}
+
+@keyframes transient-context-out{
+  from{opacity:1;transform:none}
+  to{opacity:.84;transform:translate3d(-7px,-7px,0)}
+}
+
 /* Existing anchored flyout/teaching-tip primitives already keep a presence
    lifecycle. Keep their movement crisp and let translation carry the motion. */
 .flyout.internal-popover,
@@ -81,12 +113,14 @@
 .no-motion .context-menu{
   animation:none!important;
 }
+.no-motion [data-transient-exit="true"]{display:none!important}
 
 @media(prefers-reduced-motion:reduce){
   .command-overflow-menu,
   .top-nav-overflow,
   .autosuggest-menu,
   .context-menu{animation:none!important}
+  [data-transient-exit="true"]{display:none!important}
   .charm-bar,.edge-appbar{transition-duration:.001ms!important}
 }
 
