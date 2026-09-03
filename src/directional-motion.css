@@ -1,5 +1,6 @@
 /* Direction-aware navigation motion.
-   UWP uses restrained continuity; Windows 8 keeps a stronger horizontal Metro reading direction. */
+   Sliding is the primary continuity cue. Opacity only supports depth/scrims;
+   Windows 8 keeps the stronger horizontal Metro reading direction. */
 
 .page-title-transition{
   animation-duration:var(--motion-panel);
@@ -8,6 +9,67 @@
   will-change:opacity,transform;
 }
 
+/* Pane lifecycle -----------------------------------------------------------
+   Overlay / LeftCompact panes stay mounted and interpolate one transform. This
+   makes rapid open-close-open sequences naturally reversible instead of restarting
+   a mount animation. The scrim is the only primarily opacity-driven surface. */
+.adaptive-overlay-nav:not(.minimal) .overlay-pane{
+  opacity:1;
+  transform:translate3d(-100%,0,0);
+  transition:transform .18s var(--ease-uwp);
+  will-change:transform;
+}
+.adaptive-overlay-nav:not(.minimal) .overlay-pane.open{
+  opacity:1;
+  transform:translate3d(0,0,0);
+}
+.adaptive-overlay-nav.pane-change-system:not(.minimal) .overlay-pane{transition:none}
+
+.overlay-nav-scrim{
+  opacity:0;
+  pointer-events:none;
+  animation:none;
+  transition:opacity .11s linear;
+}
+.adaptive-overlay-nav.open .overlay-nav-scrim{
+  opacity:1;
+  pointer-events:auto;
+}
+.adaptive-overlay-nav.pane-change-system .overlay-nav-scrim{transition:none}
+
+/* Drilling into a hierarchical pane is a local horizontal slide, not a fade or
+   scale. Header/list are keyed by hierarchy path in navigation.tsx, so reversal
+   receives the opposite direction without leaving stale animation state behind. */
+.overlay-pane[data-path-direction="forward"] .overlay-pane-header,
+.overlay-pane[data-path-direction="forward"] .overlay-pane-list{
+  animation:uwp-pane-level-forward-in .14s var(--ease-enter) both;
+}
+.overlay-pane[data-path-direction="backward"] .overlay-pane-header,
+.overlay-pane[data-path-direction="backward"] .overlay-pane-list{
+  animation:uwp-pane-level-backward-in .14s var(--ease-enter) both;
+}
+@keyframes uwp-pane-level-forward-in{
+  from{opacity:.9;transform:translate3d(20px,0,0)}
+  to{opacity:1;transform:translate3d(0,0,0)}
+}
+@keyframes uwp-pane-level-backward-in{
+  from{opacity:.9;transform:translate3d(-18px,0,0)}
+  to{opacity:1;transform:translate3d(0,0,0)}
+}
+
+/* Shell surfaces also enter from their physical edge. Redefining the shared
+   motion-system keyframes here removes their old opacity-led entrance. */
+@keyframes uwp-nav-left-in{
+  from{transform:translate3d(-16px,0,0)}
+  to{transform:translate3d(0,0,0)}
+}
+@keyframes uwp-nav-top-in{
+  from{transform:translate3d(0,-13px,0)}
+  to{transform:translate3d(0,0,0)}
+}
+
+/* Windows 10 page changes: short slide-through. Incoming and outgoing surfaces
+   travel in opposite directions; opacity changes only enough to separate layers. */
 .win10[data-nav-direction="forward"] .page-enter{animation-name:uwp-page-forward-in}
 .win10[data-nav-direction="backward"] .page-enter{animation-name:uwp-page-backward-in}
 .win10[data-nav-direction="neutral"] .page-enter{animation-name:uwp-page-neutral-in}
@@ -16,31 +78,37 @@
 .win10[data-nav-direction="neutral"] .page-title-transition{animation-name:uwp-title-neutral-in}
 
 @keyframes uwp-page-forward-in{
-  from{opacity:0;transform:translate3d(14px,0,0)}
-  to{opacity:1;transform:none}
+  from{opacity:.9;transform:translate3d(30px,0,0)}
+  to{opacity:1;transform:translate3d(0,0,0)}
 }
 @keyframes uwp-page-backward-in{
-  from{opacity:0;transform:translate3d(-10px,0,0)}
-  to{opacity:1;transform:none}
+  from{opacity:.9;transform:translate3d(-26px,0,0)}
+  to{opacity:1;transform:translate3d(0,0,0)}
 }
 @keyframes uwp-page-neutral-in{
-  from{opacity:0;transform:translate3d(0,6px,0)}
-  to{opacity:1;transform:none}
+  from{opacity:.94;transform:translate3d(10px,0,0)}
+  to{opacity:1;transform:translate3d(0,0,0)}
 }
 @keyframes uwp-title-forward-in{
-  from{opacity:.28;transform:translate3d(8px,0,0)}
-  to{opacity:1;transform:none}
+  from{opacity:.88;transform:translate3d(18px,0,0)}
+  to{opacity:1;transform:translate3d(0,0,0)}
 }
 @keyframes uwp-title-backward-in{
-  from{opacity:.28;transform:translate3d(-7px,0,0)}
-  to{opacity:1;transform:none}
+  from{opacity:.88;transform:translate3d(-16px,0,0)}
+  to{opacity:1;transform:translate3d(0,0,0)}
 }
 @keyframes uwp-title-neutral-in{
-  from{opacity:.35;transform:translate3d(0,4px,0)}
-  to{opacity:1;transform:none}
+  from{opacity:.92;transform:translate3d(8px,0,0)}
+  to{opacity:1;transform:translate3d(0,0,0)}
 }
 
-/* Metro page changes are more obviously horizontal, but stay far below a full-screen slide. */
+/* Page-level horizontal continuity already establishes direction. Do not add the
+   older vertical section/hero drift on top of it. */
+.win10 .page-enter>.section-head,
+.win10 .page-enter>.hero{animation:none}
+
+/* Metro page changes are more pronounced, preserving the Windows 8 horizontal
+   reading model while still avoiding full-screen carousel motion. */
 .win8[data-nav-direction="forward"] .page-enter{animation-name:metro-page-forward-in}
 .win8[data-nav-direction="backward"] .page-enter{animation-name:metro-page-backward-in}
 .win8[data-nav-direction="neutral"] .page-enter{animation-name:metro-page-neutral-in}
@@ -48,43 +116,40 @@
 .win8[data-nav-direction="backward"] .page-title-transition{animation-name:metro-title-backward-in}
 .win8[data-nav-direction="neutral"] .page-title-transition{animation-name:metro-title-neutral-in}
 
-/* In Metro, hierarchy is produced by horizontal continuity; do not add a second vertical drift. */
 .win8 .page-enter>.section-head,
-.win8 .page-enter>.hero{
-  animation-name:metro-content-reveal;
-}
+.win8 .page-enter>.hero{animation-name:metro-content-reveal}
 
 @keyframes metro-page-forward-in{
-  from{opacity:.12;transform:translate3d(34px,0,0)}
-  to{opacity:1;transform:none}
+  from{opacity:.82;transform:translate3d(48px,0,0)}
+  to{opacity:1;transform:translate3d(0,0,0)}
 }
 @keyframes metro-page-backward-in{
-  from{opacity:.12;transform:translate3d(-28px,0,0)}
-  to{opacity:1;transform:none}
+  from{opacity:.82;transform:translate3d(-40px,0,0)}
+  to{opacity:1;transform:translate3d(0,0,0)}
 }
 @keyframes metro-page-neutral-in{
-  from{opacity:0;transform:translate3d(18px,0,0)}
-  to{opacity:1;transform:none}
+  from{opacity:.86;transform:translate3d(24px,0,0)}
+  to{opacity:1;transform:translate3d(0,0,0)}
 }
 @keyframes metro-title-forward-in{
-  from{opacity:.18;transform:translate3d(22px,0,0)}
-  to{opacity:1;transform:none}
+  from{opacity:.78;transform:translate3d(30px,0,0)}
+  to{opacity:1;transform:translate3d(0,0,0)}
 }
 @keyframes metro-title-backward-in{
-  from{opacity:.18;transform:translate3d(-18px,0,0)}
-  to{opacity:1;transform:none}
+  from{opacity:.78;transform:translate3d(-26px,0,0)}
+  to{opacity:1;transform:translate3d(0,0,0)}
 }
 @keyframes metro-title-neutral-in{
-  from{opacity:.22;transform:translate3d(12px,0,0)}
-  to{opacity:1;transform:none}
+  from{opacity:.84;transform:translate3d(18px,0,0)}
+  to{opacity:1;transform:translate3d(0,0,0)}
 }
 @keyframes metro-content-reveal{
-  from{opacity:0}
+  from{opacity:.84}
   to{opacity:1}
 }
 
-/* Keep the previous page in the layout while the next page enters. The old surface is inert
-   and moves only far enough to establish direction, then disappears before the incoming page settles. */
+/* Keep the previous page in the layout while the next page enters. Matching the
+   incoming duration makes the two layers read as one directional hand-off. */
 .page-transition-stage{
   display:grid;
   align-items:start;
@@ -100,14 +165,12 @@
   z-index:1;
   pointer-events:none;
   user-select:none;
-  animation-duration:var(--motion-control);
+  animation-duration:var(--motion-page);
   animation-timing-function:var(--ease-exit);
   animation-fill-mode:both;
   will-change:opacity,transform;
 }
-.page-transition-layer.outgoing .page-enter{
-  animation-play-state:paused;
-}
+.page-transition-layer.outgoing .page-enter{animation-play-state:paused}
 
 .win10[data-nav-direction="forward"] .page-transition-layer.outgoing{animation-name:uwp-page-forward-out}
 .win10[data-nav-direction="backward"] .page-transition-layer.outgoing{animation-name:uwp-page-backward-out}
@@ -115,29 +178,27 @@
 .win8[data-nav-direction="backward"] .page-transition-layer.outgoing{animation-name:metro-page-backward-out}
 
 @keyframes uwp-page-forward-out{
-  from{opacity:1;transform:none}
-  to{opacity:0;transform:translate3d(-8px,0,0)}
+  from{opacity:1;transform:translate3d(0,0,0)}
+  to{opacity:.18;transform:translate3d(-22px,0,0)}
 }
 @keyframes uwp-page-backward-out{
-  from{opacity:1;transform:none}
-  to{opacity:0;transform:translate3d(8px,0,0)}
+  from{opacity:1;transform:translate3d(0,0,0)}
+  to{opacity:.18;transform:translate3d(22px,0,0)}
 }
 @keyframes metro-page-forward-out{
-  from{opacity:1;transform:none}
-  to{opacity:.06;transform:translate3d(-24px,0,0)}
+  from{opacity:1;transform:translate3d(0,0,0)}
+  to{opacity:.16;transform:translate3d(-34px,0,0)}
 }
 @keyframes metro-page-backward-out{
-  from{opacity:1;transform:none}
-  to{opacity:.06;transform:translate3d(20px,0,0)}
+  from{opacity:1;transform:translate3d(0,0,0)}
+  to{opacity:.16;transform:translate3d(30px,0,0)}
 }
 
 /* Era switching changes shell composition, not page position. Keep its chrome entrance local. */
-.win10 .commandbar{
-  animation:uwp-command-shell-in var(--motion-panel) var(--ease-enter) both;
-}
+.win10 .commandbar{animation:uwp-command-shell-in var(--motion-panel) var(--ease-enter) both}
 @keyframes uwp-command-shell-in{
-  from{opacity:0;transform:translate3d(0,-5px,0)}
-  to{opacity:1;transform:none}
+  from{opacity:.9;transform:translate3d(0,-8px,0)}
+  to{opacity:1;transform:translate3d(0,0,0)}
 }
 
 .no-motion .page-title-transition{animation:none!important}
