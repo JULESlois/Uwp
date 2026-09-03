@@ -17,6 +17,7 @@ import './navigation-modes.css'
 import './motion-system.css'
 import './directional-motion.css'
 import './internal-motion.css'
+import './transient-motion.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
