@@ -1,11 +1,13 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { CommandIcon, commandIconFromGlyph, type CommandIconName } from './command-icons'
-import { runInternalSlide, useLayerPresence } from './internal-motion'
+import { runInternalSlide, runLayoutFlip, useLayerPresence } from './internal-motion'
 
 export type NavItem<T extends string> = { key: T; glyph: string; label: string }
 export type PaneMode = 'auto' | 'compact' | 'expanded'
 export type Command = { label: string; glyph?: string; icon?: CommandIconName; onClick?: () => void; primary?: boolean; disabled?: boolean }
 export type ListItem = { key: string; title: string; detail?: string; glyph?: string; disabled?: boolean }
+
+type AnchoredPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end'
 
 function enabledElements(root: HTMLElement | null, selector: string) {
   if (!root) return [] as HTMLElement[]
@@ -46,6 +48,18 @@ function CommandVisual({ command, className = 'command-icon-slot' }: { command: 
   return <span className={className} aria-hidden="true">{icon ? <CommandIcon name={icon} /> : <span className="command-icon-fallback">{command.glyph}</span>}</span>
 }
 
+function resolveAnchoredPlacement(host: HTMLElement | null, floating: HTMLElement | null): AnchoredPlacement {
+  if (!host || !floating || typeof window === 'undefined') return 'bottom-start'
+  const anchor = host.getBoundingClientRect()
+  const surface = floating.getBoundingClientRect()
+  const below = window.innerHeight - anchor.bottom
+  const above = anchor.top
+  const vertical = below >= Math.min(surface.height + 12, above) ? 'bottom' : 'top'
+  const roomToRight = window.innerWidth - anchor.left
+  const horizontal = roomToRight >= surface.width + 12 ? 'start' : 'end'
+  return `${vertical}-${horizontal}` as AnchoredPlacement
+}
+
 export function CommandBar({ commands }: { commands: Command[] }) {
   const host = useRef<HTMLDivElement>(null)
   const overflowTrigger = useRef<HTMLButtonElement>(null)
@@ -75,7 +89,13 @@ export function CommandBar({ commands }: { commands: Command[] }) {
   const overflow = commands.slice(visibleCount)
   const closeOverflow = () => { setOverflowOpen(false); requestAnimationFrame(() => overflowTrigger.current?.focus()) }
 
-  return <div ref={host} className="commandbar" role="toolbar" aria-label="命令栏" onKeyDown={toolbarKeyDown}>{shown.map((command) => <button data-roving="true" key={command.label} disabled={command.disabled} className={command.primary ? 'primary' : ''} onClick={command.onClick}><CommandVisual command={command} /><b>{command.label}</b></button>)}{overflow.length > 0 && <span className="command-overflow-host"><button ref={overflowTrigger} data-roving="true" className="command-overflow-trigger" aria-haspopup="menu" aria-expanded={overflowOpen} aria-label="更多命令" onClick={() => setOverflowOpen((value) => !value)}><span className="command-icon-slot" aria-hidden="true"><CommandIcon name="more" /></span><b>更多</b></button>{overflowOpen && <><button className="command-overflow-scrim" aria-label="关闭更多命令" onClick={() => setOverflowOpen(false)} /><div ref={overflowMenu} className="command-overflow-menu" role="menu" onKeyDown={(event) => menuKeyDown(event, closeOverflow)}>{overflow.map((command) => <button key={command.label} role="menuitem" disabled={command.disabled} onClick={() => { command.onClick?.(); setOverflowOpen(false) }}><CommandVisual command={command} /><b>{command.label}</b></button>)}</div></>}</span>}</div>
+  return <div ref={host} className="commandbar" role="toolbar" aria-label="命令栏" onKeyDown={toolbarKeyDown}>
+    {shown.map((command) => <button data-roving="true" key={command.label} disabled={command.disabled} className={command.primary ? 'primary' : ''} onClick={command.onClick}><CommandVisual command={command} /><b>{command.label}</b></button>)}
+    {overflow.length > 0 && <span className="command-overflow-host">
+      <button ref={overflowTrigger} data-roving="true" className="command-overflow-trigger" aria-haspopup="menu" aria-expanded={overflowOpen} aria-label="更多命令" onClick={() => setOverflowOpen((value) => !value)}><span className="command-icon-slot" aria-hidden="true"><CommandIcon name="more" /></span><b>更多</b></button>
+      {overflowOpen && <><button className="command-overflow-scrim" aria-label="关闭更多命令" onClick={() => setOverflowOpen(false)} /><div ref={overflowMenu} className="command-overflow-menu" role="menu" onKeyDown={(event) => menuKeyDown(event, closeOverflow)}>{overflow.map((command) => <button key={command.label} role="menuitem" disabled={command.disabled} onClick={() => { command.onClick?.(); setOverflowOpen(false) }}><CommandVisual command={command} /><b>{command.label}</b></button>)}</div></>}
+    </span>}
+  </div>
 }
 
 export function AppBar({ commands, className = '' }: { commands: Command[]; className?: string }) {
@@ -88,6 +108,34 @@ export function EdgeAppBar({ open, onOpen, onClose, commands }: { open: boolean;
 
 export function Pivot<T extends string>({ tabs, value, onChange }: { tabs: Array<{ key: T; label: string }>; value: T; onChange: (value: T) => void }) {
   const root = useRef<HTMLDivElement>(null)
+  const indicatorRef = useRef<HTMLSpanElement>(null)
+
+  useLayoutEffect(() => {
+    const rootElement = root.current
+    const indicator = indicatorRef.current
+    if (!rootElement || !indicator) return
+
+    const updateIndicator = () => {
+      const active = rootElement.querySelector<HTMLButtonElement>('[role="tab"][aria-selected="true"]')
+      if (!active) {
+        indicator.style.opacity = '0'
+        return
+      }
+      const rootRect = rootElement.getBoundingClientRect()
+      const activeRect = active.getBoundingClientRect()
+      indicator.style.width = `${activeRect.width}px`
+      indicator.style.transform = `translate3d(${activeRect.left - rootRect.left}px,0,0)`
+      indicator.style.opacity = '1'
+      if (!indicator.dataset.ready) requestAnimationFrame(() => { indicator.dataset.ready = 'true' })
+    }
+
+    updateIndicator()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(updateIndicator)
+    observer.observe(rootElement)
+    return () => observer.disconnect()
+  }, [tabs.length, value])
+
   const change = (index: number, directionHint?: 'forward' | 'backward') => {
     const tab = tabs[index]
     if (!tab || tab.key === value) return
@@ -97,11 +145,21 @@ export function Pivot<T extends string>({ tabs, value, onChange }: { tabs: Array
     const panel = sibling instanceof HTMLElement ? sibling : null
     runInternalSlide(panel, 'pivot-content', direction, () => onChange(tab.key))
   }
+
   const activate = (index: number, direction: 'forward' | 'backward') => {
     change(index, direction)
     requestAnimationFrame(() => root.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[index]?.focus())
   }
-  return <div ref={root} className="pivot" role="tablist">{tabs.map((tab, index) => <button key={tab.key} role="tab" tabIndex={value === tab.key ? 0 : -1} aria-selected={value === tab.key} className={value === tab.key ? 'active' : ''} onClick={() => change(index)} onKeyDown={(event) => { if (event.key === 'ArrowRight') { event.preventDefault(); activate((index + 1) % tabs.length, 'forward') } if (event.key === 'ArrowLeft') { event.preventDefault(); activate((index - 1 + tabs.length) % tabs.length, 'backward') } if (event.key === 'Home') { event.preventDefault(); activate(0, 'backward') } if (event.key === 'End') { event.preventDefault(); activate(tabs.length - 1, 'forward') } }}>{tab.label}</button>)}</div>
+
+  return <div ref={root} className="pivot" role="tablist">
+    {tabs.map((tab, index) => <button key={tab.key} role="tab" tabIndex={value === tab.key ? 0 : -1} aria-selected={value === tab.key} className={value === tab.key ? 'active' : ''} onClick={() => change(index)} onKeyDown={(event) => {
+      if (event.key === 'ArrowRight') { event.preventDefault(); activate((index + 1) % tabs.length, 'forward') }
+      if (event.key === 'ArrowLeft') { event.preventDefault(); activate((index - 1 + tabs.length) % tabs.length, 'backward') }
+      if (event.key === 'Home') { event.preventDefault(); activate(0, 'backward') }
+      if (event.key === 'End') { event.preventDefault(); activate(tabs.length - 1, 'forward') }
+    }}>{tab.label}</button>)}
+    <span ref={indicatorRef} className="pivot-indicator" aria-hidden="true" />
+  </div>
 }
 
 export function RadioButton({ checked, onChange, label, name, value, stopPropagation = false, disabled = false }: { checked: boolean; onChange: () => void; label?: ReactNode; name?: string; value?: string; stopPropagation?: boolean; disabled?: boolean }) {
@@ -123,19 +181,44 @@ export function AutoSuggestBox({ value, onChange, suggestions, placeholder = '�
   const matches = suggestions.filter((item) => item.toLowerCase().includes(value.toLowerCase())).slice(0, 5)
   const choose = (item: string) => { onChange(item); setOpen(false); setActiveIndex(0) }
   const optionId = (index: number) => `${listId}-option-${index}`
-  return <div className={`autosuggest${disabled ? ' disabled' : ''}`}><span className="autosuggest-input"><span className="autosuggest-command-icon" aria-hidden="true"><CommandIcon name="search" /></span><input value={value} disabled={disabled} placeholder={placeholder} aria-autocomplete="list" aria-expanded={!disabled && open && matches.length > 0} aria-controls={listId} aria-activedescendant={!disabled && open && matches[activeIndex] ? optionId(activeIndex) : undefined} onFocus={() => setOpen(true)} onChange={(event) => { onChange(event.target.value); setOpen(true); setActiveIndex(0) }} onKeyDown={(event) => { if (event.key === 'ArrowDown' && matches.length) { event.preventDefault(); setOpen(true); setActiveIndex((index) => (index + 1) % matches.length) } if (event.key === 'ArrowUp' && matches.length) { event.preventDefault(); setOpen(true); setActiveIndex((index) => (index - 1 + matches.length) % matches.length) } if (event.key === 'Enter' && open && matches[activeIndex]) { event.preventDefault(); choose(matches[activeIndex]!) } if (event.key === 'Escape') { setOpen(false); setActiveIndex(0) } }} /></span>{!disabled && open && value && matches.length > 0 && <div id={listId} className="autosuggest-menu" role="listbox">{matches.map((item, index) => <button id={optionId(index)} className={index === activeIndex ? 'active' : ''} key={item} role="option" aria-selected={index === activeIndex} tabIndex={-1} onMouseDown={(event) => event.preventDefault()} onMouseEnter={() => setActiveIndex(index)} onClick={() => choose(item)}>{item}</button>)}</div>}</div>
+
+  return <div className={`autosuggest${disabled ? ' disabled' : ''}`}><span className="autosuggest-input"><span className="autosuggest-command-icon" aria-hidden="true"><CommandIcon name="search" /></span><input value={value} disabled={disabled} placeholder={placeholder} aria-autocomplete="list" aria-expanded={!disabled && open && matches.length > 0} aria-controls={listId} aria-activedescendant={!disabled && open && matches[activeIndex] ? optionId(activeIndex) : undefined} onFocus={() => setOpen(true)} onChange={(event) => { onChange(event.target.value); setOpen(true); setActiveIndex(0) }} onKeyDown={(event) => {
+    if (event.key === 'ArrowDown' && matches.length) { event.preventDefault(); setOpen(true); setActiveIndex((index) => (index + 1) % matches.length) }
+    if (event.key === 'ArrowUp' && matches.length) { event.preventDefault(); setOpen(true); setActiveIndex((index) => (index - 1 + matches.length) % matches.length) }
+    if (event.key === 'Enter' && open && matches[activeIndex]) { event.preventDefault(); choose(matches[activeIndex]!) }
+    if (event.key === 'Escape') { setOpen(false); setActiveIndex(0) }
+  }} /></span>{!disabled && open && value && matches.length > 0 && <div id={listId} className="autosuggest-menu" role="listbox">{matches.map((item, index) => <button id={optionId(index)} className={index === activeIndex ? 'active' : ''} key={item} role="option" aria-selected={index === activeIndex} tabIndex={-1} onMouseDown={(event) => event.preventDefault()} onMouseEnter={() => setActiveIndex(index)} onClick={() => choose(item)}>{item}</button>)}</div>}</div>
 }
 
 export function Flyout({ open, onClose, anchor, children }: { open: boolean; onClose: () => void; anchor: ReactNode; children: ReactNode }) {
   const host = useRef<HTMLSpanElement>(null)
+  const flyoutRef = useRef<HTMLDivElement>(null)
   const returnFocus = useRef<HTMLElement | null>(null)
+  const wasOpen = useRef(false)
+  const [placement, setPlacement] = useState<AnchoredPlacement>('bottom-start')
+  const presence = useLayerPresence(open)
+
+  useLayoutEffect(() => {
+    if (!presence.mounted) return
+    setPlacement(resolveAnchoredPlacement(host.current, flyoutRef.current))
+  }, [presence.mounted, open])
+
   useEffect(() => {
-    if (!open) return
-    returnFocus.current = document.activeElement as HTMLElement
-    requestAnimationFrame(() => host.current?.querySelector<HTMLElement>('.flyout [role="menuitem"]:not(:disabled),.flyout button:not(:disabled)')?.focus())
+    if (open && !wasOpen.current) {
+      returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+      requestAnimationFrame(() => flyoutRef.current?.querySelector<HTMLElement>('[role="menuitem"]:not(:disabled),button:not(:disabled)')?.focus())
+    } else if (!open && wasOpen.current) {
+      requestAnimationFrame(() => returnFocus.current?.focus())
+    }
+    wasOpen.current = open
   }, [open])
-  const close = () => { onClose(); requestAnimationFrame(() => returnFocus.current?.focus()) }
-  return <span ref={host} className="flyout-anchor">{anchor}{open && <><button className="flyout-scrim" aria-label="关闭弹出菜单" onClick={close} /><div className="flyout" role="menu" onKeyDown={(event) => menuKeyDown(event, close)}>{children}</div></>}</span>
+
+  const close = () => onClose()
+
+  return <span ref={host} className="flyout-anchor">{anchor}{presence.mounted && <>
+    <button className={`flyout-scrim internal-popover-scrim${open ? ' active' : ''}`} aria-label="关闭弹出菜单" tabIndex={open ? 0 : -1} onClick={close} />
+    <div ref={flyoutRef} className={`flyout internal-popover placement-${placement}${presence.entered ? ' entered' : ''}`} role="menu" aria-hidden={!open} onKeyDown={(event) => { if (open) menuKeyDown(event, close) }} onTransitionEnd={(event) => { if (event.target !== flyoutRef.current || event.propertyName !== 'transform' || open) return; presence.finishExit() }}>{children}</div>
+  </>}</span>
 }
 
 export function ContentDialog({ open, title, children, onClose }: { open: boolean; title: string; children: ReactNode; onClose: () => void }) {
@@ -174,6 +257,7 @@ export function ContentDialog({ open, title, children, onClose }: { open: boolea
     if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
   }
+
   return <div className={`dialog-layer internal-layer${open ? ' active' : ''}${presence.entered ? ' entered' : ''}`} role="presentation" aria-hidden={!open}><button className="dialog-scrim" aria-label="关闭对话框" tabIndex={open ? 0 : -1} onClick={close} /><section ref={dialogRef} className="dialog" role="dialog" aria-modal={open || undefined} aria-labelledby={titleId} onKeyDown={trap} onTransitionEnd={(event) => { if (event.target !== dialogRef.current || event.propertyName !== 'transform' || open) return; presence.finishExit() }}><h2 id={titleId}>{title}</h2><div>{children}</div><footer><button className="button accent" tabIndex={open ? 0 : -1} onClick={close}>确定</button><button className="button" tabIndex={open ? 0 : -1} onClick={close}>取消</button></footer></section></div>
 }
 
@@ -211,6 +295,7 @@ export function SettingsPane({ open, title, onClose, children }: { open: boolean
     if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
   }
+
   return <div className={`settings-layer internal-layer${open ? ' active' : ''}${presence.entered ? ' entered' : ''}`} aria-hidden={!open}><button className="settings-scrim" aria-label="关闭设置面板" tabIndex={open ? 0 : -1} onClick={onClose} /><aside ref={paneRef} className="settings-pane" aria-label={title} onKeyDown={trap} onTransitionEnd={(event) => { if (event.target !== paneRef.current || event.propertyName !== 'transform' || open) return; presence.finishExit() }}><header><button className="settings-pane-back" tabIndex={open ? 0 : -1} onClick={onClose} aria-label="返回"><span className="settings-back-icon" aria-hidden="true"><CommandIcon name="back" /></span></button><h2>{title}</h2></header>{children}</aside></div>
 }
 
@@ -227,6 +312,7 @@ export function ContextMenu({ children, items }: { children: ReactNode; items: A
     const rect = event.currentTarget.getBoundingClientRect()
     openAt(rect.left + 28, rect.top + 28)
   }
+
   return <div ref={hostRef} className="context-host" tabIndex={0} onKeyDown={openFromKeyboard} onContextMenu={(event) => { event.preventDefault(); openAt(event.clientX, event.clientY) }}>{children}{menu && <><button className="context-scrim" aria-label="关闭上下文菜单" onClick={close} /><div ref={menuRef} className="context-menu" role="menu" style={{ left: menu.x, top: menu.y }} onKeyDown={(event) => menuKeyDown(event, close)}>{items.map((item) => <button key={item.label} disabled={item.disabled} role="menuitem" onClick={() => { item.onClick?.(); setMenu(null) }}>{item.label}</button>)}</div></>}</div>
 }
 
@@ -237,6 +323,7 @@ export function SplitView({ pane, children }: { pane: ReactNode; children: React
 export function MasterDetailsView({ items, value, onChange, renderDetail }: { items: ListItem[]; value: string; onChange: (key: string) => void; renderDetail: (item: ListItem) => ReactNode }) {
   const detailRef = useRef<HTMLElement>(null)
   const current = items.find((item) => item.key === value) ?? items.find((item) => !item.disabled) ?? items[0]
+
   const select = (item: ListItem) => {
     if (item.disabled || item.key === current?.key) return
     const currentIndex = Math.max(0, items.findIndex((candidate) => candidate.key === current?.key))
@@ -244,6 +331,7 @@ export function MasterDetailsView({ items, value, onChange, renderDetail }: { it
     const direction = nextIndex > currentIndex ? 'forward' : 'backward'
     runInternalSlide(detailRef.current, 'master-detail', direction, () => onChange(item.key))
   }
+
   return <div className="master-details"><aside>{items.map((item) => <RadioButton key={item.key} name="master-details" value={item.key} disabled={item.disabled} checked={current?.key === item.key} onChange={() => select(item)} label={<span className="master-label"><strong>{item.title}</strong>{item.detail && <small>{item.detail}</small>}</span>} />)}</aside><section ref={detailRef}>{current && renderDetail(current)}</section></div>
 }
 
@@ -253,6 +341,7 @@ export function SemanticZoom({ zoomedOut, onChange, overview, detail }: { zoomed
     const next = !zoomedOut
     runInternalSlide(contentRef.current, 'semantic-zoom-content', zoomedOut ? 'forward' : 'backward', () => onChange(next))
   }
+
   return <div className="semantic-zoom"><div className="semantic-toolbar"><button className="zoom-button" onClick={toggle} aria-label={zoomedOut ? '放大查看磁贴' : '缩小查看分组'}>{zoomedOut ? '+' : '−'}</button></div><div ref={contentRef} className="semantic-zoom-content">{zoomedOut ? overview : detail}</div></div>
 }
 
@@ -265,7 +354,17 @@ export function AcrylicPane({ children }: { children: ReactNode }) {
 }
 
 export function TeachingTip({ open, title, children, anchor, onClose }: { open: boolean; title: string; children: ReactNode; anchor: ReactNode; onClose: () => void }) {
-  return <span className="teaching-anchor">{anchor}{open && <div className="teaching-tip" role="status"><button className="teaching-close" aria-label="关闭提示" onClick={onClose}><span className="teaching-close-icon" aria-hidden="true"><CommandIcon name="close" /></span></button><strong>{title}</strong><div>{children}</div></div>}</span>
+  const hostRef = useRef<HTMLSpanElement>(null)
+  const tipRef = useRef<HTMLDivElement>(null)
+  const [placement, setPlacement] = useState<AnchoredPlacement>('bottom-start')
+  const presence = useLayerPresence(open)
+
+  useLayoutEffect(() => {
+    if (!presence.mounted) return
+    setPlacement(resolveAnchoredPlacement(hostRef.current, tipRef.current))
+  }, [presence.mounted, open])
+
+  return <span ref={hostRef} className="teaching-anchor">{anchor}{presence.mounted && <div ref={tipRef} className={`teaching-tip internal-popover placement-${placement}${presence.entered ? ' entered' : ''}`} role="status" aria-hidden={!open} onTransitionEnd={(event) => { if (event.target !== tipRef.current || event.propertyName !== 'transform' || open) return; presence.finishExit() }}><button className="teaching-close" tabIndex={open ? 0 : -1} aria-label="关闭提示" onClick={onClose}><span className="teaching-close-icon" aria-hidden="true"><CommandIcon name="close" /></span></button><strong>{title}</strong><div>{children}</div></div>}</span>
 }
 
 export function CharmBar({ open, onOpen, onClose, onSelect }: { open: boolean; onOpen: () => void; onClose: () => void; onSelect: (command: string) => void }) {
@@ -274,7 +373,9 @@ export function CharmBar({ open, onOpen, onClose, onSelect }: { open: boolean; o
 }
 
 export function SnapView({ snapped, onChange }: { snapped: boolean; onChange: (value: boolean) => void }) {
-  return <div className={`snap-demo${snapped ? ' snapped' : ''}`}><div className="snap-main"><h3>主视图</h3><p>宽屏时使用完整内容区域；Snap 后保留核心阅读与操作。</p></div><aside><button className="button" onClick={() => onChange(!snapped)}>{snapped ? '恢复完整视图' : '模拟 Snap View'}</button><p>{snapped ? '320px 级窄栏状态' : '拖到屏幕边缘时切换布局状态'}</p></aside></div>
+  const rootRef = useRef<HTMLDivElement>(null)
+  const toggle = () => runLayoutFlip(rootRef.current, () => onChange(!snapped))
+  return <div ref={rootRef} className={`snap-demo${snapped ? ' snapped' : ''}`}><div className="snap-main" data-flip-key="main"><h3>主视图</h3><p>宽屏时使用完整内容区域；Snap 后保留核心阅读与操作。</p></div><aside data-flip-key="aside"><button className="button" onClick={toggle}>{snapped ? '恢复完整视图' : '模拟 Snap View'}</button><p>{snapped ? '320px 级窄栏状态' : '拖到屏幕边缘时切换布局状态'}</p></aside></div>
 }
 
 export function Tile({ title, meta, glyph, wide, tone = 'blue', disabled = false }: { title: string; meta: string; glyph: string; wide?: boolean; tone?: 'blue' | 'green' | 'orange' | 'purple' | 'gray'; disabled?: boolean }) {
