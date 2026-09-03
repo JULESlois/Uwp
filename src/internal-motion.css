@@ -1,6 +1,6 @@
 /* Internal view motion grammar ------------------------------------------------
    Same-level and hierarchy changes use horizontal slide-through. Temporary
-   edge panes stay mounted and reverse the same transform when interrupted. */
+   layers stay mounted long enough to reverse the same transform when interrupted. */
 
 ::view-transition-old(pivot-content),
 ::view-transition-new(pivot-content),
@@ -34,8 +34,28 @@ html[data-internal-motion-direction="backward"]::view-transition-new(semantic-zo
 
 .semantic-zoom-content,.master-details>section{min-width:0}
 
-/* Presence-based overlays: content stays mounted while exiting so a reopen can
-   reverse the current transition instead of replaying from an endpoint. */
+/* Pivot indicator ----------------------------------------------------------- */
+.pivot{position:relative}
+.pivot button.active::after{display:none!important}
+.pivot-indicator{
+  position:absolute;
+  left:0;
+  bottom:3px;
+  width:0;
+  height:2px;
+  opacity:0;
+  background:var(--accent);
+  pointer-events:none;
+  transform:translate3d(0,0,0);
+}
+.pivot-indicator[data-ready="true"]{
+  transition:
+    transform var(--motion-panel) var(--ease-uwp),
+    width var(--motion-panel) var(--ease-uwp),
+    opacity 80ms linear;
+}
+
+/* Presence-based modal/edge layers ----------------------------------------- */
 .dialog-layer.internal-layer,.settings-layer.internal-layer{pointer-events:none}
 .dialog-layer.internal-layer.active,.settings-layer.internal-layer.active{pointer-events:auto}
 .dialog-layer.internal-layer .dialog-scrim,.settings-layer.internal-layer .settings-scrim{opacity:0;transition:opacity var(--motion-panel) linear}
@@ -57,8 +77,67 @@ html[data-internal-motion-direction="backward"]::view-transition-new(semantic-zo
 }
 .settings-layer.internal-layer.entered .settings-pane{transform:none}
 
+/* Anchored flyouts / teaching tips ----------------------------------------- */
+.internal-popover{
+  transition:transform var(--motion-panel) var(--ease-uwp);
+  will-change:transform;
+  pointer-events:none;
+}
+.internal-popover.entered{transform:none!important;pointer-events:auto}
+
+.flyout.internal-popover.placement-bottom-start,
+.teaching-tip.internal-popover.placement-bottom-start{
+  top:calc(100% + 8px);
+  right:auto;
+  bottom:auto;
+  left:0;
+  transform:translate3d(0,-10px,0);
+}
+.flyout.internal-popover.placement-bottom-end,
+.teaching-tip.internal-popover.placement-bottom-end{
+  top:calc(100% + 8px);
+  right:0;
+  bottom:auto;
+  left:auto;
+  transform:translate3d(0,-10px,0);
+}
+.flyout.internal-popover.placement-top-start,
+.teaching-tip.internal-popover.placement-top-start{
+  top:auto;
+  right:auto;
+  bottom:calc(100% + 8px);
+  left:0;
+  transform:translate3d(0,10px,0);
+}
+.flyout.internal-popover.placement-top-end,
+.teaching-tip.internal-popover.placement-top-end{
+  top:auto;
+  right:0;
+  bottom:calc(100% + 8px);
+  left:auto;
+  transform:translate3d(0,10px,0);
+}
+
+.flyout-scrim.internal-popover-scrim{pointer-events:none}
+.flyout-scrim.internal-popover-scrim.active{pointer-events:auto}
+
+.teaching-tip.internal-popover.placement-bottom-start::before{top:-7px;right:auto;bottom:auto;left:22px}
+.teaching-tip.internal-popover.placement-bottom-end::before{top:-7px;right:22px;bottom:auto;left:auto}
+.teaching-tip.internal-popover.placement-top-start::before{top:auto;right:auto;bottom:-7px;left:22px}
+.teaching-tip.internal-popover.placement-top-end::before{top:auto;right:22px;bottom:-7px;left:auto}
+
+/* SnapView: state changes reflow immediately, while children follow their
+   previous screen positions through a FLIP transform. */
+.snap-demo{transition:grid-template-columns var(--motion-panel) var(--ease-uwp)}
+.snap-demo>[data-flip-key]{backface-visibility:hidden}
+
 @media(prefers-reduced-motion:reduce){
   ::view-transition-old(pivot-content),::view-transition-new(pivot-content),
   ::view-transition-old(master-detail),::view-transition-new(master-detail),
   ::view-transition-old(semantic-zoom-content),::view-transition-new(semantic-zoom-content){animation-duration:.001ms!important}
+  .pivot-indicator,.internal-popover,.dialog-layer.internal-layer .dialog,.settings-layer.internal-layer .settings-pane,.snap-demo{transition-duration:.001ms!important}
+}
+
+@media(forced-colors:active){
+  .pivot-indicator{background:Highlight}
 }
