@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { CommandIcon, commandIconFromGlyph, type CommandIconName } from './command-icons'
+import { runInternalSlide, useLayerPresence } from './internal-motion'
 
 export type NavItem<T extends string> = { key: T; glyph: string; label: string }
 export type PaneMode = 'auto' | 'compact' | 'expanded'
@@ -87,13 +88,20 @@ export function EdgeAppBar({ open, onOpen, onClose, commands }: { open: boolean;
 
 export function Pivot<T extends string>({ tabs, value, onChange }: { tabs: Array<{ key: T; label: string }>; value: T; onChange: (value: T) => void }) {
   const root = useRef<HTMLDivElement>(null)
-  const activate = (index: number) => {
+  const change = (index: number, directionHint?: 'forward' | 'backward') => {
     const tab = tabs[index]
-    if (!tab) return
-    onChange(tab.key)
+    if (!tab || tab.key === value) return
+    const currentIndex = Math.max(0, tabs.findIndex((candidate) => candidate.key === value))
+    const direction = directionHint ?? (index > currentIndex ? 'forward' : 'backward')
+    const sibling = root.current?.nextElementSibling
+    const panel = sibling instanceof HTMLElement ? sibling : null
+    runInternalSlide(panel, 'pivot-content', direction, () => onChange(tab.key))
+  }
+  const activate = (index: number, direction: 'forward' | 'backward') => {
+    change(index, direction)
     requestAnimationFrame(() => root.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[index]?.focus())
   }
-  return <div ref={root} className="pivot" role="tablist">{tabs.map((tab, index) => <button key={tab.key} role="tab" tabIndex={value === tab.key ? 0 : -1} aria-selected={value === tab.key} className={value === tab.key ? 'active' : ''} onClick={() => onChange(tab.key)} onKeyDown={(event) => { if (event.key === 'ArrowRight') { event.preventDefault(); activate((index + 1) % tabs.length) } if (event.key === 'ArrowLeft') { event.preventDefault(); activate((index - 1 + tabs.length) % tabs.length) } if (event.key === 'Home') { event.preventDefault(); activate(0) } if (event.key === 'End') { event.preventDefault(); activate(tabs.length - 1) } }}>{tab.label}</button>)}</div>
+  return <div ref={root} className="pivot" role="tablist">{tabs.map((tab, index) => <button key={tab.key} role="tab" tabIndex={value === tab.key ? 0 : -1} aria-selected={value === tab.key} className={value === tab.key ? 'active' : ''} onClick={() => change(index)} onKeyDown={(event) => { if (event.key === 'ArrowRight') { event.preventDefault(); activate((index + 1) % tabs.length, 'forward') } if (event.key === 'ArrowLeft') { event.preventDefault(); activate((index - 1 + tabs.length) % tabs.length, 'backward') } if (event.key === 'Home') { event.preventDefault(); activate(0, 'backward') } if (event.key === 'End') { event.preventDefault(); activate(tabs.length - 1, 'forward') } }}>{tab.label}</button>)}</div>
 }
 
 export function RadioButton({ checked, onChange, label, name, value, stopPropagation = false, disabled = false }: { checked: boolean; onChange: () => void; label?: ReactNode; name?: string; value?: string; stopPropagation?: boolean; disabled?: boolean }) {
@@ -134,14 +142,29 @@ export function ContentDialog({ open, title, children, onClose }: { open: boolea
   const titleId = useId()
   const dialogRef = useRef<HTMLElement>(null)
   const returnFocus = useRef<HTMLElement | null>(null)
+  const wasOpen = useRef(false)
+  const focusVersion = useRef(0)
+  const presence = useLayerPresence(open)
+
   useEffect(() => {
-    if (!open) return
-    returnFocus.current = document.activeElement as HTMLElement
-    requestAnimationFrame(() => dialogRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus())
+    const version = ++focusVersion.current
+    if (open && !wasOpen.current) {
+      returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+      requestAnimationFrame(() => {
+        if (focusVersion.current === version) dialogRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus()
+      })
+    } else if (!open && wasOpen.current) {
+      requestAnimationFrame(() => {
+        if (focusVersion.current === version) returnFocus.current?.focus()
+      })
+    }
+    wasOpen.current = open
   }, [open])
-  if (!open) return null
-  const close = () => { onClose(); requestAnimationFrame(() => returnFocus.current?.focus()) }
+
+  if (!presence.mounted) return null
+  const close = () => onClose()
   const trap = (event: ReactKeyboardEvent<HTMLElement>) => {
+    if (!open) return
     if (event.key === 'Escape') { event.preventDefault(); close(); return }
     if (event.key !== 'Tab') return
     const focusable = enabledElements(dialogRef.current, 'button:not(:disabled),input:not(:disabled),select:not(:disabled),[tabindex]:not([tabindex="-1"])')
@@ -151,12 +174,44 @@ export function ContentDialog({ open, title, children, onClose }: { open: boolea
     if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
   }
-  return <div className="dialog-layer" role="presentation"><button className="dialog-scrim" aria-label="关闭对话框" onClick={close} /><section ref={dialogRef} className="dialog" role="dialog" aria-modal="true" aria-labelledby={titleId} onKeyDown={trap}><h2 id={titleId}>{title}</h2><div>{children}</div><footer><button className="button accent" onClick={close}>确定</button><button className="button" onClick={close}>取消</button></footer></section></div>
+  return <div className={`dialog-layer internal-layer${open ? ' active' : ''}${presence.entered ? ' entered' : ''}`} role="presentation" aria-hidden={!open}><button className="dialog-scrim" aria-label="关闭对话框" tabIndex={open ? 0 : -1} onClick={close} /><section ref={dialogRef} className="dialog" role="dialog" aria-modal={open || undefined} aria-labelledby={titleId} onKeyDown={trap} onTransitionEnd={(event) => { if (event.target !== dialogRef.current || event.propertyName !== 'transform' || open) return; presence.finishExit() }}><h2 id={titleId}>{title}</h2><div>{children}</div><footer><button className="button accent" tabIndex={open ? 0 : -1} onClick={close}>确定</button><button className="button" tabIndex={open ? 0 : -1} onClick={close}>取消</button></footer></section></div>
 }
 
 export function SettingsPane({ open, title, onClose, children }: { open: boolean; title: string; onClose: () => void; children: ReactNode }) {
-  if (!open) return null
-  return <div className="settings-layer"><button className="settings-scrim" aria-label="关闭设置面板" onClick={onClose} /><aside className="settings-pane" aria-label={title} onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); onClose() } }}><header><button className="settings-pane-back" onClick={onClose} aria-label="返回"><span className="settings-back-icon" aria-hidden="true"><CommandIcon name="back" /></span></button><h2>{title}</h2></header>{children}</aside></div>
+  const paneRef = useRef<HTMLElement>(null)
+  const returnFocus = useRef<HTMLElement | null>(null)
+  const wasOpen = useRef(false)
+  const focusVersion = useRef(0)
+  const presence = useLayerPresence(open)
+
+  useEffect(() => {
+    const version = ++focusVersion.current
+    if (open && !wasOpen.current) {
+      returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+      requestAnimationFrame(() => {
+        if (focusVersion.current === version) paneRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus()
+      })
+    } else if (!open && wasOpen.current) {
+      requestAnimationFrame(() => {
+        if (focusVersion.current === version) returnFocus.current?.focus()
+      })
+    }
+    wasOpen.current = open
+  }, [open])
+
+  if (!presence.mounted) return null
+  const trap = (event: ReactKeyboardEvent<HTMLElement>) => {
+    if (!open) return
+    if (event.key === 'Escape') { event.preventDefault(); onClose(); return }
+    if (event.key !== 'Tab') return
+    const focusable = enabledElements(paneRef.current, 'button:not(:disabled),input:not(:disabled),select:not(:disabled),[tabindex]:not([tabindex="-1"])')
+    if (!focusable.length) return
+    const first = focusable[0]!
+    const last = focusable[focusable.length - 1]!
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+  }
+  return <div className={`settings-layer internal-layer${open ? ' active' : ''}${presence.entered ? ' entered' : ''}`} aria-hidden={!open}><button className="settings-scrim" aria-label="关闭设置面板" tabIndex={open ? 0 : -1} onClick={onClose} /><aside ref={paneRef} className="settings-pane" aria-label={title} onKeyDown={trap} onTransitionEnd={(event) => { if (event.target !== paneRef.current || event.propertyName !== 'transform' || open) return; presence.finishExit() }}><header><button className="settings-pane-back" tabIndex={open ? 0 : -1} onClick={onClose} aria-label="返回"><span className="settings-back-icon" aria-hidden="true"><CommandIcon name="back" /></span></button><h2>{title}</h2></header>{children}</aside></div>
 }
 
 export function ContextMenu({ children, items }: { children: ReactNode; items: Array<{ label: string; onClick?: () => void; disabled?: boolean }> }) {
@@ -180,12 +235,25 @@ export function SplitView({ pane, children }: { pane: ReactNode; children: React
 }
 
 export function MasterDetailsView({ items, value, onChange, renderDetail }: { items: ListItem[]; value: string; onChange: (key: string) => void; renderDetail: (item: ListItem) => ReactNode }) {
+  const detailRef = useRef<HTMLElement>(null)
   const current = items.find((item) => item.key === value) ?? items.find((item) => !item.disabled) ?? items[0]
-  return <div className="master-details"><aside>{items.map((item) => <RadioButton key={item.key} name="master-details" value={item.key} disabled={item.disabled} checked={current?.key === item.key} onChange={() => onChange(item.key)} label={<span className="master-label"><strong>{item.title}</strong>{item.detail && <small>{item.detail}</small>}</span>} />)}</aside><section>{current && renderDetail(current)}</section></div>
+  const select = (item: ListItem) => {
+    if (item.disabled || item.key === current?.key) return
+    const currentIndex = Math.max(0, items.findIndex((candidate) => candidate.key === current?.key))
+    const nextIndex = items.findIndex((candidate) => candidate.key === item.key)
+    const direction = nextIndex > currentIndex ? 'forward' : 'backward'
+    runInternalSlide(detailRef.current, 'master-detail', direction, () => onChange(item.key))
+  }
+  return <div className="master-details"><aside>{items.map((item) => <RadioButton key={item.key} name="master-details" value={item.key} disabled={item.disabled} checked={current?.key === item.key} onChange={() => select(item)} label={<span className="master-label"><strong>{item.title}</strong>{item.detail && <small>{item.detail}</small>}</span>} />)}</aside><section ref={detailRef}>{current && renderDetail(current)}</section></div>
 }
 
 export function SemanticZoom({ zoomedOut, onChange, overview, detail }: { zoomedOut: boolean; onChange: (value: boolean) => void; overview: ReactNode; detail: ReactNode }) {
-  return <div className="semantic-zoom"><div className="semantic-toolbar"><button className="zoom-button" onClick={() => onChange(!zoomedOut)} aria-label={zoomedOut ? '放大查看磁贴' : '缩小查看分组'}>{zoomedOut ? '+' : '−'}</button></div>{zoomedOut ? overview : detail}</div>
+  const contentRef = useRef<HTMLDivElement>(null)
+  const toggle = () => {
+    const next = !zoomedOut
+    runInternalSlide(contentRef.current, 'semantic-zoom-content', zoomedOut ? 'forward' : 'backward', () => onChange(next))
+  }
+  return <div className="semantic-zoom"><div className="semantic-toolbar"><button className="zoom-button" onClick={toggle} aria-label={zoomedOut ? '放大查看磁贴' : '缩小查看分组'}>{zoomedOut ? '+' : '−'}</button></div><div ref={contentRef} className="semantic-zoom-content">{zoomedOut ? overview : detail}</div></div>
 }
 
 export function RevealSurface({ children }: { children: ReactNode }) {
