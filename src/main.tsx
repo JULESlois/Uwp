@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
+import './transient-lifecycle'
 import './collection-motion'
 import './layout-motion'
 import './tokens.css'
