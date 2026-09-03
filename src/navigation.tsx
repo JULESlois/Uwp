@@ -95,14 +95,30 @@ function normalizeMode(mode: NavigationPaneMode, autoMode: ResolvedPaneMode): Re
   return mode
 }
 
-function useAutoPaneMode() {
+function useAutoPaneMode(scopeRef: { current: HTMLElement | null }) {
   const [mode, setMode] = useState<ResolvedPaneMode>(() => modeForWidth(typeof window === 'undefined' ? 1280 : window.innerWidth))
-  useEffect(() => {
-    const update = () => setMode(modeForWidth(window.innerWidth))
+
+  useLayoutEffect(() => {
+    const marker = scopeRef.current
+    const host = marker?.closest<HTMLElement>('.app') ?? marker?.parentElement
+    if (!host) return
+
+    const update = () => setMode(modeForWidth(host.getBoundingClientRect().width))
     update()
+
+    if ('ResizeObserver' in window) {
+      const observer = new ResizeObserver((entries) => {
+        const width = entries[0]?.contentRect.width ?? host.getBoundingClientRect().width
+        setMode(modeForWidth(width))
+      })
+      observer.observe(host)
+      return () => observer.disconnect()
+    }
+
     window.addEventListener('resize', update, { passive: true })
     return () => window.removeEventListener('resize', update)
-  }, [])
+  }, [scopeRef])
+
   return mode
 }
 
@@ -186,10 +202,21 @@ function useNavigationHistory<T extends string>(value: T, onChange: (value: T) =
 }
 
 export function AdaptiveNavigationView<T extends string>({ items, value, onChange, mode = 'auto' }: { items: NavItem<T>[]; value: T; onChange: (value: T) => void; mode?: NavigationPaneMode }) {
-  const autoMode = useAutoPaneMode()
+  const scopeRef = useRef<HTMLSpanElement>(null)
+  const autoMode = useAutoPaneMode(scopeRef)
   const resolved = normalizeMode(mode, autoMode)
   const history = useNavigationHistory(value, onChange)
   const pane = usePaneLifecycle(resolved)
+
+  useLayoutEffect(() => {
+    const app = scopeRef.current?.closest<HTMLElement>('.app')
+    if (!app) return
+    if (mode === 'auto') app.dataset.resolvedNav = resolved
+    else delete app.dataset.resolvedNav
+    return () => {
+      if (app.dataset.resolvedNav === resolved) delete app.dataset.resolvedNav
+    }
+  }, [mode, resolved])
 
   useEffect(() => {
     const keyDown = (event: KeyboardEvent) => {
@@ -201,11 +228,14 @@ export function AdaptiveNavigationView<T extends string>({ items, value, onChang
     return () => window.removeEventListener('keydown', keyDown, true)
   }, [history.canGoBack, history.goBack])
 
-  if (resolved === 'top') return <TopNavigationView items={items} value={value} onChange={history.navigate} canGoBack={history.canGoBack} onBack={history.goBack} />
-  if (resolved === 'left') return <LeftNavigationView items={items} value={value} onChange={history.navigate} open={pane.open} source={pane.source} onOpenChange={pane.setUserOpen} />
-  if (resolved === 'leftCompact') return <OverlayNavigationView items={items} value={value} onChange={history.navigate} open={pane.open} source={pane.source} onUserOpenChange={pane.setUserOpen} onNavigationOpenChange={pane.setNavigationOpen} />
-  if (resolved === 'leftMinimal') return <OverlayNavigationView items={items} value={value} onChange={history.navigate} open={pane.open} source={pane.source} onUserOpenChange={pane.setUserOpen} onNavigationOpenChange={pane.setNavigationOpen} minimal />
-  return <OverlayNavigationView items={items} value={value} onChange={history.navigate} open={pane.open} source={pane.source} onUserOpenChange={pane.setUserOpen} onNavigationOpenChange={pane.setNavigationOpen} hierarchical />
+  let navigation
+  if (resolved === 'top') navigation = <TopNavigationView items={items} value={value} onChange={history.navigate} canGoBack={history.canGoBack} onBack={history.goBack} />
+  else if (resolved === 'left') navigation = <LeftNavigationView items={items} value={value} onChange={history.navigate} open={pane.open} source={pane.source} onOpenChange={pane.setUserOpen} />
+  else if (resolved === 'leftCompact') navigation = <OverlayNavigationView items={items} value={value} onChange={history.navigate} open={pane.open} source={pane.source} onUserOpenChange={pane.setUserOpen} onNavigationOpenChange={pane.setNavigationOpen} />
+  else if (resolved === 'leftMinimal') navigation = <OverlayNavigationView items={items} value={value} onChange={history.navigate} open={pane.open} source={pane.source} onUserOpenChange={pane.setUserOpen} onNavigationOpenChange={pane.setNavigationOpen} minimal />
+  else navigation = <OverlayNavigationView items={items} value={value} onChange={history.navigate} open={pane.open} source={pane.source} onUserOpenChange={pane.setUserOpen} onNavigationOpenChange={pane.setNavigationOpen} hierarchical />
+
+  return <><span ref={scopeRef} hidden aria-hidden="true" />{navigation}</>
 }
 
 function LeftNavigationView<T extends string>({ items, value, onChange, open, source, onOpenChange }: { items: NavItem<T>[]; value: T; onChange: (value: T) => void; open: boolean; source: PaneChangeSource; onOpenChange: (value: boolean) => void }) {
