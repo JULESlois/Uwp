@@ -137,12 +137,14 @@ function schedule(elements: Iterable<HTMLElement>) {
   requestAnimationFrame(() => pending.forEach(animateSurface))
 }
 
-function navigationSignature(className: string) {
-  return className.split(/\s+/).filter((token) => token === 'win8' || token === 'win10' || token.startsWith('nav-')).join(' ')
+function navigationSignature(className: string, resolvedNav = '') {
+  const classes = className.split(/\s+/).filter((token) => token === 'win8' || token === 'win10' || token.startsWith('nav-')).join(' ')
+  return `${classes}|${resolvedNav}`
 }
 
-function animateNavigationLayout(app: HTMLElement, previousClassName: string) {
-  if (navigationSignature(previousClassName) === navigationSignature(app.className)) return
+function animateNavigationLayout(app: HTMLElement, previousSignature: string) {
+  const currentSignature = navigationSignature(app.className, app.dataset.resolvedNav ?? '')
+  if (previousSignature === currentSignature) return
   const surfaces = Array.from(app.querySelectorAll<HTMLElement>(NAV_CONTINUITY_SELECTOR))
   surfaces.forEach(register)
   // MutationObserver runs before ResizeObserver delivery. Measure the new layout
@@ -172,8 +174,12 @@ function install() {
     for (const record of records) {
       if (record.type === 'attributes') {
         const target = record.target
-        if (target instanceof HTMLElement && target.classList.contains('app') && record.attributeName === 'class') {
-          animateNavigationLayout(target, record.oldValue ?? '')
+        if (target instanceof HTMLElement && target.classList.contains('app')) {
+          if (record.attributeName === 'class') {
+            animateNavigationLayout(target, navigationSignature(record.oldValue ?? '', target.dataset.resolvedNav ?? ''))
+          } else if (record.attributeName === 'data-resolved-nav') {
+            animateNavigationLayout(target, navigationSignature(target.className, record.oldValue ?? ''))
+          }
         }
         continue
       }
@@ -194,7 +200,7 @@ function install() {
     characterData: true,
     attributes: true,
     attributeOldValue: true,
-    attributeFilter: ['class'],
+    attributeFilter: ['class', 'data-resolved-nav'],
   })
 }
 
