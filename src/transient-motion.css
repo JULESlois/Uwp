@@ -1,0 +1,106 @@
+/* Transient surface motion ---------------------------------------------------
+   Menus and suggestion surfaces use short directional slides. Physical edge
+   surfaces keep full edge travel. No scale/bounce is used anywhere here. */
+
+.command-overflow-menu,
+.top-nav-overflow,
+.autosuggest-menu,
+.context-menu{
+  will-change:transform,opacity;
+  backface-visibility:hidden;
+  animation:transient-slide-down 150ms var(--ease-uwp) both;
+}
+
+.command-overflow-menu,
+.top-nav-overflow{
+  transform-origin:top right;
+}
+
+.autosuggest-menu{
+  transform-origin:top left;
+}
+
+.context-menu{
+  animation-name:transient-context-in;
+  transform-origin:top left;
+}
+
+@keyframes transient-slide-down{
+  from{opacity:.9;transform:translate3d(0,-10px,0)}
+  to{opacity:1;transform:none}
+}
+
+@keyframes transient-context-in{
+  from{opacity:.9;transform:translate3d(-7px,-7px,0)}
+  to{opacity:1;transform:none}
+}
+
+/* Existing anchored flyout/teaching-tip primitives already keep a presence
+   lifecycle. Keep their movement crisp and let translation carry the motion. */
+.flyout.internal-popover,
+.teaching-tip.internal-popover{
+  transition-duration:var(--motion-panel);
+  transition-timing-function:var(--ease-uwp);
+}
+
+/* Windows 8 edge surfaces --------------------------------------------------- */
+.charm-bar{
+  pointer-events:none;
+  will-change:transform;
+  transition:transform var(--motion-panel) var(--ease-uwp);
+}
+.charm-bar.open{pointer-events:auto}
+
+.edge-appbar{
+  will-change:transform;
+  transition:transform var(--motion-panel) var(--ease-uwp);
+}
+
+/* Keep content inside edge surfaces stationary while the surface itself moves;
+   repeated clicks therefore reverse one transform instead of stacking child motion. */
+.charm-bar button,
+.edge-appbar .appbar,
+.edge-appbar .appbar button{
+  animation:none!important;
+}
+
+/* Focus should remain a state change, not become a second motion system. */
+.command-overflow-menu button:focus-visible,
+.top-nav-overflow button:focus-visible,
+.autosuggest-menu button:focus-visible,
+.context-menu button:focus-visible,
+.charm-bar button:focus-visible,
+.edge-appbar button:focus-visible{
+  outline:2px solid currentColor;
+  outline-offset:-2px;
+}
+
+.no-motion .command-overflow-menu,
+.no-motion .top-nav-overflow,
+.no-motion .autosuggest-menu,
+.no-motion .context-menu{
+  animation:none!important;
+}
+
+@media(prefers-reduced-motion:reduce){
+  .command-overflow-menu,
+  .top-nav-overflow,
+  .autosuggest-menu,
+  .context-menu{animation:none!important}
+  .charm-bar,.edge-appbar{transition-duration:.001ms!important}
+}
+
+@media(forced-colors:active){
+  .command-overflow-menu,
+  .top-nav-overflow,
+  .autosuggest-menu,
+  .context-menu,
+  .charm-bar,
+  .edge-appbar .appbar{
+    forced-color-adjust:auto;
+  }
+  .command-overflow-menu,
+  .top-nav-overflow,
+  .autosuggest-menu,
+  .context-menu{border:1px solid CanvasText}
+}
