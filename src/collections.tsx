@@ -53,6 +53,36 @@ function nextEnabledIndex(items: ListItem[], start: number, delta: number) {
   return start
 }
 
+function nextGridHorizontalIndex(items: ListItem[], start: number, columns: number, direction: -1 | 1) {
+  const rowStart = Math.floor(start / columns) * columns
+  const rowEnd = Math.min(items.length, rowStart + columns)
+  let index = start + direction
+  while (index >= rowStart && index < rowEnd) {
+    if (!items[index]?.disabled) return index
+    index += direction
+  }
+  return start
+}
+
+function nextGridVerticalIndex(items: ListItem[], start: number, columns: number, direction: -1 | 1) {
+  const column = start % columns
+  let row = Math.floor(start / columns) + direction
+  while (row >= 0 && row * columns < items.length) {
+    const rowStart = row * columns
+    const rowEnd = Math.min(items.length, rowStart + columns)
+    const desired = rowStart + column
+    if (desired < rowEnd) {
+      if (!items[desired]?.disabled) return desired
+    } else {
+      for (let index = rowEnd - 1; index >= rowStart; index -= 1) {
+        if (!items[index]?.disabled) return index
+      }
+    }
+    row += direction
+  }
+  return start
+}
+
 function adjacentOutsideIndex(items: ListItem[], keys: string[], direction: -1 | 1) {
   const indices = keys.map((key) => items.findIndex((item) => item.key === key)).filter((index) => index >= 0)
   if (!indices.length) return -1
@@ -434,7 +464,8 @@ export function CollectionView({ items, selected, onSelectionChange, selectionMo
         if (!target || target.disabled) return
         focusIndex(targetIndex)
         if (selectionMode === 'extended' && event.shiftKey) {
-          if (!selected.length) anchor.current = item.key
+          const anchorExists = items.some((candidate) => candidate.key === anchor.current && !candidate.disabled)
+          if (!selected.length || !anchorExists) anchor.current = item.key
           const range = rangeKeys(items, anchor.current || item.key, target.key)
           const additive = event.ctrlKey || event.metaKey
           onSelectionChange(additive ? Array.from(new Set([...selected, ...range])) : range)
@@ -445,12 +476,12 @@ export function CollectionView({ items, selected, onSelectionChange, selectionMo
       if (event.key === 'Enter') { event.preventDefault(); if (!item.disabled) onItemInvoked?.(item); return }
       if (event.key === ' ') { event.preventDefault(); selectItem(item, event); return }
       if (event.key === 'Escape' && swipe) { event.preventDefault(); setSwipe(null); return }
-      if (event.key === 'ArrowRight' && layout === 'grid') { event.preventDefault(); moveFocus(nextEnabledIndex(items, index, 1)); return }
-      if (event.key === 'ArrowLeft' && layout === 'grid') { event.preventDefault(); moveFocus(nextEnabledIndex(items, index, -1)); return }
-      if (event.key === 'ArrowDown') { event.preventDefault(); moveFocus(nextEnabledIndex(items, index, columns)); return }
-      if (event.key === 'ArrowUp') { event.preventDefault(); moveFocus(nextEnabledIndex(items, index, -columns)); return }
-      if (event.key === 'Home') { event.preventDefault(); const first = items.findIndex((candidate) => !candidate.disabled); if (first >= 0) moveFocus(first) }
-      if (event.key === 'End') { event.preventDefault(); const rev = [...items].reverse().findIndex((candidate) => !candidate.disabled); if (rev >= 0) moveFocus(items.length - 1 - rev) }
+      if (event.key === 'ArrowRight' && layout === 'grid') { event.preventDefault(); moveFocus(nextGridHorizontalIndex(items, index, columns, 1)); return }
+      if (event.key === 'ArrowLeft' && layout === 'grid') { event.preventDefault(); moveFocus(nextGridHorizontalIndex(items, index, columns, -1)); return }
+      if (event.key === 'ArrowDown') { event.preventDefault(); moveFocus(layout === 'grid' ? nextGridVerticalIndex(items, index, columns, 1) : nextEnabledIndex(items, index, 1)); return }
+      if (event.key === 'ArrowUp') { event.preventDefault(); moveFocus(layout === 'grid' ? nextGridVerticalIndex(items, index, columns, -1) : nextEnabledIndex(items, index, -1)); return }
+      if (event.key === 'Home') { event.preventDefault(); const first = items.findIndex((candidate) => !candidate.disabled); if (first >= 0) moveFocus(first); return }
+      if (event.key === 'End') { event.preventDefault(); const rev = [...items].reverse().findIndex((candidate) => !candidate.disabled); if (rev >= 0) moveFocus(items.length - 1 - rev); return }
     }}>{layout === 'list' && <div className="swipe-actions" aria-hidden={openedSwipeKey !== item.key}><button className="swipe-action" tabIndex={openedSwipeKey === item.key ? 0 : -1} onClick={(event) => { event.stopPropagation(); onItemInvoked?.(item); setSwipe(null) }}>打开</button>{selectionMode !== 'none' && <button className="swipe-action" tabIndex={openedSwipeKey === item.key ? 0 : -1} onClick={(event) => { event.stopPropagation(); selectItem(item, { ctrlKey: true }); setSwipe(null) }}>{active ? '取消' : '选择'}</button>}</div>}{itemContent}</div>
     return <Fragment key={item.key}>{placeholder && !dropTarget?.after ? placeholder : null}{row}{placeholder && dropTarget?.after ? placeholder : null}</Fragment>
   })}{marquee && <div className="selection-marquee" style={marquee} aria-hidden="true" />}</div>
