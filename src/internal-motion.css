@@ -1,0 +1,64 @@
+/* Internal view motion grammar ------------------------------------------------
+   Same-level and hierarchy changes use horizontal slide-through. Temporary
+   edge panes stay mounted and reverse the same transform when interrupted. */
+
+::view-transition-old(pivot-content),
+::view-transition-new(pivot-content),
+::view-transition-old(master-detail),
+::view-transition-new(master-detail),
+::view-transition-old(semantic-zoom-content),
+::view-transition-new(semantic-zoom-content){
+  animation-duration:var(--motion-panel);
+  animation-timing-function:var(--ease-uwp);
+  animation-fill-mode:both;
+  mix-blend-mode:normal;
+}
+
+html[data-internal-motion-direction="forward"]::view-transition-old(pivot-content),
+html[data-internal-motion-direction="forward"]::view-transition-old(master-detail),
+html[data-internal-motion-direction="forward"]::view-transition-old(semantic-zoom-content){animation-name:internal-slide-forward-out}
+html[data-internal-motion-direction="forward"]::view-transition-new(pivot-content),
+html[data-internal-motion-direction="forward"]::view-transition-new(master-detail),
+html[data-internal-motion-direction="forward"]::view-transition-new(semantic-zoom-content){animation-name:internal-slide-forward-in}
+html[data-internal-motion-direction="backward"]::view-transition-old(pivot-content),
+html[data-internal-motion-direction="backward"]::view-transition-old(master-detail),
+html[data-internal-motion-direction="backward"]::view-transition-old(semantic-zoom-content){animation-name:internal-slide-backward-out}
+html[data-internal-motion-direction="backward"]::view-transition-new(pivot-content),
+html[data-internal-motion-direction="backward"]::view-transition-new(master-detail),
+html[data-internal-motion-direction="backward"]::view-transition-new(semantic-zoom-content){animation-name:internal-slide-backward-in}
+
+@keyframes internal-slide-forward-out{from{opacity:1;transform:none}to{opacity:.82;transform:translate3d(-22px,0,0)}}
+@keyframes internal-slide-forward-in{from{opacity:.88;transform:translate3d(30px,0,0)}to{opacity:1;transform:none}}
+@keyframes internal-slide-backward-out{from{opacity:1;transform:none}to{opacity:.82;transform:translate3d(22px,0,0)}}
+@keyframes internal-slide-backward-in{from{opacity:.88;transform:translate3d(-30px,0,0)}to{opacity:1;transform:none}}
+
+.semantic-zoom-content,.master-details>section{min-width:0}
+
+/* Presence-based overlays: content stays mounted while exiting so a reopen can
+   reverse the current transition instead of replaying from an endpoint. */
+.dialog-layer.internal-layer,.settings-layer.internal-layer{pointer-events:none}
+.dialog-layer.internal-layer.active,.settings-layer.internal-layer.active{pointer-events:auto}
+.dialog-layer.internal-layer .dialog-scrim,.settings-layer.internal-layer .settings-scrim{opacity:0;transition:opacity var(--motion-panel) linear}
+.dialog-layer.internal-layer.entered .dialog-scrim,.settings-layer.internal-layer.entered .settings-scrim{opacity:1}
+
+.dialog-layer.internal-layer .dialog{
+  animation:none!important;
+  transform:translate3d(0,26px,0);
+  transition:transform var(--motion-panel) var(--ease-uwp);
+  will-change:transform;
+}
+.dialog-layer.internal-layer.entered .dialog{transform:none}
+
+.settings-layer.internal-layer .settings-pane{
+  animation:none!important;
+  transform:translate3d(100%,0,0);
+  transition:transform var(--motion-panel) var(--ease-uwp);
+  will-change:transform;
+}
+.settings-layer.internal-layer.entered .settings-pane{transform:none}
+
+@media(prefers-reduced-motion:reduce){
+  ::view-transition-old(pivot-content),::view-transition-new(pivot-content),
+  ::view-transition-old(master-detail),::view-transition-new(master-detail),
+  ::view-transition-old(semantic-zoom-content),::view-transition-new(semantic-zoom-content){animation-duration:.001ms!important}
+}
