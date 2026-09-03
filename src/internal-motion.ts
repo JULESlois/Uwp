@@ -14,7 +14,7 @@ type TransitionDocument = Document & {
 
 let activeTransition: ViewTransitionHandle | null = null
 
-function motionDisabled(host: HTMLElement | null) {
+export function motionDisabled(host: HTMLElement | null) {
   if (typeof window === 'undefined') return true
   if (host?.closest('.no-motion')) return true
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -69,6 +69,42 @@ export function runInternalSlide(host: HTMLElement | null, name: string, directi
     activeTransition = null
     host.style.removeProperty('view-transition-name')
     delete document.documentElement.dataset.internalMotionDirection
+  })
+}
+
+export function runLayoutFlip(host: HTMLElement | null, update: () => void, selector = '[data-flip-key]') {
+  if (!host || motionDisabled(host)) {
+    update()
+    return
+  }
+
+  const before = new Map<string, DOMRect>()
+  host.querySelectorAll<HTMLElement>(selector).forEach((element) => {
+    const key = element.dataset.flipKey
+    if (key) before.set(key, element.getBoundingClientRect())
+  })
+
+  flushSync(update)
+
+  requestAnimationFrame(() => {
+    host.querySelectorAll<HTMLElement>(selector).forEach((element) => {
+      const key = element.dataset.flipKey
+      if (!key) return
+      const previous = before.get(key)
+      if (!previous) return
+      const next = element.getBoundingClientRect()
+      const dx = previous.left - next.left
+      const dy = previous.top - next.top
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return
+      element.getAnimations().forEach((animation) => animation.cancel())
+      element.animate([
+        { transform: `translate3d(${dx}px,${dy}px,0)` },
+        { transform: 'translate3d(0,0,0)' },
+      ], {
+        duration: 190,
+        easing: 'cubic-bezier(.1,.9,.2,1)',
+      })
+    })
   })
 }
 
