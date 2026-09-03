@@ -2,14 +2,8 @@
    Each NavigationView pane mode must remain visually and spatially distinct.
    These are structural differences, not decorative skins. */
 
-/* Top is a primary navigation strip, not browser history chrome. The global
-   Alt+Left history gesture remains available, but Top itself never renders a
-   redundant back affordance. */
-.app.win10.nav-top .top-nav-back{display:none!important}
-/* TopNavigationView currently reserves 48px in its JS measurement once
-   navigation history exists. Reclaim approximately that space in the hidden
-   measuring strip until the reserve is removed from the component itself. */
-.app.win10.nav-top .top-navigation:has(.top-nav-back) .top-nav-measure>[data-measure-item]{padding-inline:10px}
+/* Top is a primary navigation strip, not browser history chrome. App history is
+   still available globally through Alt+Left, but Top itself stays navigation-only. */
 
 /* Left = persistent expanded pane. In the explicit Left study mode it does
    not collapse into the same 58px rail used by LeftCompact. Auto keeps its
@@ -23,9 +17,9 @@
 .app.win10.nav-left .side-nav-toggle,
 .app.win10.nav-expanded .side-nav-toggle{display:none}
 .app.win10.nav-left .side-nav-brand,
-.app.win10.nav-expanded .side-nav-brand{display:flex;align-items:center;min-height:56px;padding:0 22px;opacity:1!important;pointer-events:auto!important}
+.app.win10.nav-expanded .side-nav-brand{display:flex;align-items:center;min-height:56px;padding:0 22px;transform:none!important;pointer-events:auto!important}
 .app.win10.nav-left .side-navigation.closed .side-nav-action b,
-.app.win10.nav-expanded .side-navigation.closed .side-nav-action b{visibility:visible}
+.app.win10.nav-expanded .side-navigation.closed .side-nav-action b{transform:none!important;pointer-events:auto!important}
 .app.win10.nav-left>.shell,
 .app.win10.nav-expanded>.shell{padding-left:214px!important}
 
