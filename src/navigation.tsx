@@ -103,20 +103,13 @@ function useAutoPaneMode(scopeRef: { current: HTMLElement | null }) {
     const host = marker?.closest<HTMLElement>('.app') ?? marker?.parentElement
     if (!host) return
 
-    const update = () => setMode(modeForWidth(host.getBoundingClientRect().width))
-    update()
-
-    if ('ResizeObserver' in window) {
-      const observer = new ResizeObserver((entries) => {
-        const width = entries[0]?.contentRect.width ?? host.getBoundingClientRect().width
-        setMode(modeForWidth(width))
-      })
-      observer.observe(host)
-      return () => observer.disconnect()
-    }
-
-    window.addEventListener('resize', update, { passive: true })
-    return () => window.removeEventListener('resize', update)
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width ?? host.getBoundingClientRect().width
+      setMode(modeForWidth(width))
+    })
+    observer.observe(host)
+    setMode(modeForWidth(host.getBoundingClientRect().width))
+    return () => observer.disconnect()
   }, [scopeRef])
 
   return mode
