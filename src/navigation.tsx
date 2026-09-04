@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type Ref } from 'react'
 import type { NavItem, PaneMode } from './components'
+import { useStableElementWidth } from './measurement'
 
 export type NavigationPaneMode = PaneMode | 'overlay' | 'left' | 'leftCompact' | 'leftMinimal' | 'top'
 export type NavigationNode<T extends string> = {
@@ -258,17 +259,19 @@ function LeftNavigationView<T extends string>({ items, value, onChange, open, so
 
 function useStableVisibleCount<T extends string>(items: NavItem<T>[], hostRef: { current: HTMLElement | null }, measureRef: { current: HTMLDivElement | null }) {
   const [visibleCount, setVisibleCount] = useState(items.length)
-  const lastWidthRef = useRef<number | null>(null)
-  const settleTimerRef = useRef<number | null>(null)
+  const stableWidth = useStableElementWidth(hostRef, {
+    hysteresis: TOP_NAV_WIDTH_HYSTERESIS,
+    settleDelay: TOP_NAV_SETTLE_DELAY,
+  })
 
   useLayoutEffect(() => {
     const host = hostRef.current
     const measureHost = measureRef.current
     if (!host || !measureHost) return
 
-    const calculate = (width: number) => {
+    const calculate = () => {
       const widths = Array.from(measureHost.querySelectorAll<HTMLElement>('[data-measure-item]')).map((item) => item.offsetWidth)
-      const available = Math.max(0, width - 24)
+      const available = Math.max(0, (stableWidth || host.clientWidth) - 24)
       const overflowWidth = 52
       let used = 0
       let count = 0
@@ -283,50 +286,15 @@ function useStableVisibleCount<T extends string>(items: NavItem<T>[], hostRef: {
       setVisibleCount((current) => current === next ? current : next)
     }
 
-    const clearSettle = () => {
-      if (settleTimerRef.current === null) return
-      window.clearTimeout(settleTimerRef.current)
-      settleTimerRef.current = null
-    }
-
-    const commitWidth = (width: number) => {
-      clearSettle()
-      lastWidthRef.current = width
-      calculate(width)
-    }
-
-    const observeWidth = (width: number) => {
-      const previous = lastWidthRef.current
-      if (previous === null || Math.abs(width - previous) >= TOP_NAV_WIDTH_HYSTERESIS) {
-        commitWidth(width)
-        return
-      }
-      clearSettle()
-      settleTimerRef.current = window.setTimeout(() => {
-        settleTimerRef.current = null
-        lastWidthRef.current = width
-        calculate(width)
-      }, TOP_NAV_SETTLE_DELAY)
-    }
-
-    const observer = new ResizeObserver((entries) => {
-      const width = entries[0]?.contentRect.width
-      if (width !== undefined) observeWidth(width)
-    })
-    observer.observe(host)
-    commitWidth(host.getBoundingClientRect().width)
-
+    calculate()
     let cancelled = false
     document.fonts?.ready.then(() => {
-      if (!cancelled) calculate(lastWidthRef.current ?? host.getBoundingClientRect().width)
+      if (!cancelled) calculate()
     })
-
     return () => {
       cancelled = true
-      clearSettle()
-      observer.disconnect()
     }
-  }, [items, hostRef, measureRef])
+  }, [items, hostRef, measureRef, stableWidth])
 
   return visibleCount
 }
