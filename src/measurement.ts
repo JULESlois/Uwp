@@ -11,6 +11,15 @@ type FitWidthOptions = {
   minVisible?: number
 }
 
+type MeasuredItemsOptions = StableWidthOptions & {
+  selector: string
+  signature?: string
+}
+
+function sameWidths(a: readonly number[], b: readonly number[]) {
+  return a.length === b.length && a.every((value, index) => value === b[index])
+}
+
 export function readMeasuredWidths(root: ParentNode, selector: string) {
   return Array.from(root.querySelectorAll<HTMLElement>(selector)).map((item) => item.offsetWidth)
 }
@@ -117,4 +126,37 @@ export function useStableElementWidth<T extends HTMLElement>(
   }, [hysteresis, ref, settleDelay])
 
   return width
+}
+
+export function useMeasuredItemWidths<THost extends HTMLElement, TMeasure extends HTMLElement>(
+  hostRef: RefObject<THost | null>,
+  measureRef: RefObject<TMeasure | null>,
+  { selector, signature = '', ...widthOptions }: MeasuredItemsOptions,
+) {
+  const stableWidth = useStableElementWidth(hostRef, widthOptions)
+  const [widths, setWidths] = useState<number[]>([])
+
+  useLayoutEffect(() => {
+    const measureRoot = measureRef.current
+    if (!measureRoot) return
+
+    const calculate = () => {
+      const next = readMeasuredWidths(measureRoot, selector)
+      setWidths((current) => sameWidths(current, next) ? current : next)
+    }
+
+    calculate()
+    let cancelled = false
+    document.fonts?.ready.then(() => {
+      if (!cancelled) calculate()
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [measureRef, selector, signature, stableWidth])
+
+  return {
+    widths,
+    availableWidth: stableWidth || hostRef.current?.clientWidth || widthOptions.fallbackWidth || 0,
+  }
 }
