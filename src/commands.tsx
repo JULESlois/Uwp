@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import type { Command } from './components'
 import { CommandIcon, commandIconFromGlyph, type CommandIconName } from './command-icons'
-import { useStableElementWidth } from './measurement'
+import { allocatePriorityIndices, readMeasuredWidths, useStableElementWidth } from './measurement'
 
 export type PriorityCommand = Omit<Command, 'glyph'> & {
   glyph?: string
@@ -51,6 +51,10 @@ function CommandGlyph({ command }: { command: PriorityCommand }) {
   return <span className="priority-command-icon" aria-hidden="true">{icon ? <CommandIcon name={icon} /> : <span className="priority-command-fallback">{command.glyph}</span>}</span>
 }
 
+function sameIndices(a: readonly number[], b: readonly number[]) {
+  return a.length === b.length && a.every((value, index) => value === b[index])
+}
+
 export function PriorityCommandBar({ commands }: { commands: PriorityCommand[] }) {
   const host = useRef<HTMLDivElement>(null)
   const overflowTrigger = useRef<HTMLButtonElement>(null)
@@ -63,32 +67,23 @@ export function PriorityCommandBar({ commands }: { commands: PriorityCommand[] }
   useEffect(() => {
     const root = host.current
     if (!root) return
-    const widths = Array.from(root.querySelectorAll<HTMLElement>('[data-command-measure]')).map((item) => item.offsetWidth)
-    const allIndices = commands.map((_, index) => index)
-    const total = widths.reduce((sum, width) => sum + width, 0)
-    const available = stableWidth || root.clientWidth
-    if (!widths.length || total <= available) {
-      setVisibleIndices(allIndices)
-      return
+
+    const calculate = () => {
+      const widths = readMeasuredWidths(root, '[data-command-measure]')
+      const available = stableWidth || root.clientWidth
+      const priorities = commands.map((command) => command.priority ?? 'primary')
+      const next = allocatePriorityIndices(widths, available, priorities, { overflowReserve: 52, minVisible: 1 })
+      setVisibleIndices((current) => sameIndices(current, next) ? current : next)
     }
 
-    const overflowReserve = 52
-    const budget = Math.max(0, available - overflowReserve)
-    const visible = new Set(allIndices)
-    let used = total
-
-    const removeUntilFit = (indices: number[]) => {
-      for (const index of indices) {
-        if (used <= budget || visible.size <= 1) break
-        if (!visible.has(index)) continue
-        visible.delete(index)
-        used -= widths[index] ?? 0
-      }
+    calculate()
+    let cancelled = false
+    document.fonts?.ready.then(() => {
+      if (!cancelled) calculate()
+    })
+    return () => {
+      cancelled = true
     }
-
-    removeUntilFit(allIndices.filter((index) => commands[index]?.priority === 'secondary').reverse())
-    removeUntilFit(allIndices.filter((index) => visible.has(index)).reverse())
-    setVisibleIndices(allIndices.filter((index) => visible.has(index)))
   }, [commands.length, signature, stableWidth])
 
   useEffect(() => {
