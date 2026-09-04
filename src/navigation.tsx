@@ -13,6 +13,7 @@ export type NavigationNode<T extends string> = {
 type ResolvedPaneMode = 'left' | 'leftCompact' | 'leftMinimal' | 'overlay' | 'top'
 type PaneChangeSource = 'user' | 'system' | 'navigation'
 type PathDirection = 'neutral' | 'forward' | 'backward'
+type TopFocusKey<T extends string> = T | '__more__'
 
 type NavigationChromeProps = {
   title: string
@@ -20,6 +21,9 @@ type NavigationChromeProps = {
   backLabel?: string
   className?: string
 }
+
+const TOP_NAV_WIDTH_HYSTERESIS = 12
+const TOP_NAV_SETTLE_DELAY = 140
 
 function NavigationBackButton({ onClick, label = '返回上一页', className = '' }: { onClick: () => void; label?: string; className?: string }) {
   return <button className={`navigation-chrome-button navigation-back ${className}`.trim()} aria-label={label} onClick={onClick}>←</button>
@@ -39,6 +43,15 @@ function toLeaf<T extends string>(item: NavItem<T>): NavigationNode<T> {
 
 function nodeIsActive<T extends string>(node: NavigationNode<T>, value: T): boolean {
   return node.key === value || Boolean(node.children?.some((child) => nodeIsActive(child, value)))
+}
+
+function activeBranchIds<T extends string>(nodes: NavigationNode<T>[], value: T, result: string[] = []) {
+  for (const node of nodes) {
+    if (!node.children?.length || !nodeIsActive(node, value)) continue
+    result.push(node.id)
+    activeBranchIds(node.children, value, result)
+  }
+  return result
 }
 
 function findNode<T extends string>(nodes: NavigationNode<T>[], id: string): NavigationNode<T> | undefined {
@@ -243,55 +256,108 @@ function LeftNavigationView<T extends string>({ items, value, onChange, open, so
   return <aside ref={rootRef} className={`side-navigation${open ? ' open' : ' closed'} pane-change-${source}`} aria-label="主导航"><div className="side-navigation-header"><NavigationPaneToggle open={open} onClick={() => onOpenChange(!open)} className="side-nav-toggle" /><strong className="side-nav-brand">UWP LAB</strong></div><nav className="side-nav-items">{items.map((item, index) => <button key={item.key} className={`side-nav-action${value === item.key ? ' active' : ''}`} aria-current={value === item.key ? 'page' : undefined} aria-label={!open ? item.label : undefined} tabIndex={focusKey === item.key ? 0 : -1} onFocus={() => setFocusKey(item.key)} onClick={() => { setFocusKey(item.key); onChange(item.key) }} onKeyDown={(event) => keyDown(event, index)}><span aria-hidden="true">{item.glyph}</span><b>{item.label}</b></button>)}</nav></aside>
 }
 
-function TopNavigationView<T extends string>({ items, value, onChange }: { items: NavItem<T>[]; value: T; onChange: (value: T) => void }) {
-  const hostRef = useRef<HTMLElement>(null)
-  const measureRef = useRef<HTMLDivElement>(null)
-  const menuRef = useRef<HTMLDivElement>(null)
-  const moreRef = useRef<HTMLButtonElement>(null)
+function useStableVisibleCount<T extends string>(items: NavItem<T>[], hostRef: { current: HTMLElement | null }, measureRef: { current: HTMLDivElement | null }) {
   const [visibleCount, setVisibleCount] = useState(items.length)
-  const [recoveredKey, setRecoveredKey] = useState<T | null>(null)
-  const [open, setOpen] = useState(false)
+  const lastWidthRef = useRef<number | null>(null)
+  const settleTimerRef = useRef<number | null>(null)
 
   useLayoutEffect(() => {
     const host = hostRef.current
     const measureHost = measureRef.current
     if (!host || !measureHost) return
-    const measure = () => {
+
+    const calculate = (width: number) => {
       const widths = Array.from(measureHost.querySelectorAll<HTMLElement>('[data-measure-item]')).map((item) => item.offsetWidth)
-      const available = Math.max(0, host.clientWidth - 24)
+      const available = Math.max(0, width - 24)
       const overflowWidth = 52
       let used = 0
       let count = 0
       for (let index = 0; index < widths.length; index += 1) {
-        const width = widths[index] ?? 0
+        const itemWidth = widths[index] ?? 0
         const reserve = index < widths.length - 1 ? overflowWidth : 0
-        if (used + width + reserve > available) break
-        used += width
+        if (used + itemWidth + reserve > available) break
+        used += itemWidth
         count += 1
       }
-      setVisibleCount(Math.max(1, Math.min(items.length, count)))
+      const next = items.length === 0 ? 0 : Math.max(1, Math.min(items.length, count))
+      setVisibleCount((current) => current === next ? current : next)
     }
-    const observer = new ResizeObserver(measure)
+
+    const clearSettle = () => {
+      if (settleTimerRef.current === null) return
+      window.clearTimeout(settleTimerRef.current)
+      settleTimerRef.current = null
+    }
+
+    const commitWidth = (width: number) => {
+      clearSettle()
+      lastWidthRef.current = width
+      calculate(width)
+    }
+
+    const observeWidth = (width: number) => {
+      const previous = lastWidthRef.current
+      if (previous === null || Math.abs(width - previous) >= TOP_NAV_WIDTH_HYSTERESIS) {
+        commitWidth(width)
+        return
+      }
+      clearSettle()
+      settleTimerRef.current = window.setTimeout(() => {
+        settleTimerRef.current = null
+        lastWidthRef.current = width
+        calculate(width)
+      }, TOP_NAV_SETTLE_DELAY)
+    }
+
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width
+      if (width !== undefined) observeWidth(width)
+    })
     observer.observe(host)
-    measure()
-    return () => observer.disconnect()
-  }, [items])
+    commitWidth(host.getBoundingClientRect().width)
 
-  useEffect(() => {
-    const selectedIndex = items.findIndex((item) => item.key === value)
-    if (selectedIndex < 0 || selectedIndex < visibleCount || visibleCount >= items.length) {
-      setRecoveredKey(null)
-      return
+    let cancelled = false
+    document.fonts?.ready.then(() => {
+      if (!cancelled) calculate(lastWidthRef.current ?? host.getBoundingClientRect().width)
+    })
+
+    return () => {
+      cancelled = true
+      clearSettle()
+      observer.disconnect()
     }
-    setRecoveredKey(value)
-  }, [items, value, visibleCount])
+  }, [items, hostRef, measureRef])
 
-  const recoveredIndex = recoveredKey ? items.findIndex((item) => item.key === recoveredKey) : -1
+  return visibleCount
+}
+
+function TopNavigationView<T extends string>({ items, value, onChange }: { items: NavItem<T>[]; value: T; onChange: (value: T) => void }) {
+  const hostRef = useRef<HTMLElement>(null)
+  const measureRef = useRef<HTMLDivElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const moreRef = useRef<HTMLButtonElement>(null)
+  const visibleCount = useStableVisibleCount(items, hostRef, measureRef)
+  const [focusKey, setFocusKey] = useState<TopFocusKey<T>>(value)
+  const [open, setOpen] = useState(false)
+
+  const selectedIndex = items.findIndex((item) => item.key === value)
   let visible = items.slice(0, visibleCount)
-  if (recoveredIndex >= visibleCount && visibleCount > 0) visible = [...items.slice(0, Math.max(0, visibleCount - 1)), items[recoveredIndex]!]
+  if (selectedIndex >= visibleCount && visibleCount > 0) {
+    visible = [...items.slice(0, Math.max(0, visibleCount - 1)), items[selectedIndex]!]
+  }
   const visibleKeys = new Set(visible.map((item) => item.key))
   const overflow = items.filter((item) => !visibleKeys.has(item.key))
   const overflowActive = overflow.some((item) => item.key === value)
+  const focusIsVisible = focusKey !== '__more__' && visibleKeys.has(focusKey)
+  const rovingKey: TopFocusKey<T> | null = focusIsVisible
+    ? focusKey
+    : focusKey === '__more__' && overflow.length > 0
+      ? '__more__'
+      : visibleKeys.has(value)
+        ? value
+        : overflowActive && overflow.length > 0
+          ? '__more__'
+          : visible[0]?.key ?? (overflow.length > 0 ? '__more__' : null)
 
   useEffect(() => {
     if (!open) return
@@ -305,6 +371,23 @@ function TopNavigationView<T extends string>({ items, value, onChange }: { items
   useEffect(() => {
     if (open && overflow.length === 0) setOpen(false)
   }, [open, overflow.length])
+
+  const focusPrimaryOrMore = (key: T) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const host = hostRef.current
+      if (!host) return
+      const recovered = Array.from(host.querySelectorAll<HTMLButtonElement>('.top-nav-action')).find((button) => button.dataset.navKey === key)
+      if (recovered) {
+        setFocusKey(key)
+        recovered.focus()
+        return
+      }
+      if (moreRef.current) {
+        setFocusKey('__more__')
+        moreRef.current.focus()
+      }
+    }))
+  }
 
   const moveTopFocus = (event: ReactKeyboardEvent<HTMLElement>, delta: number) => {
     const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('.top-nav-action,.top-nav-more')).filter((button) => button.offsetParent !== null)
@@ -334,23 +417,24 @@ function TopNavigationView<T extends string>({ items, value, onChange }: { items
     if (event.key === 'ArrowLeft') moveTopFocus(event, -1)
     if (event.key === 'Home') { event.preventDefault(); event.currentTarget.querySelector<HTMLButtonElement>('.top-nav-action')?.focus() }
     if (event.key === 'End') { event.preventDefault(); const buttons = event.currentTarget.querySelectorAll<HTMLButtonElement>('.top-nav-action,.top-nav-more'); buttons[buttons.length - 1]?.focus() }
-  }}><div ref={measureRef} className="top-nav-measure" aria-hidden="true">{items.map((item) => <span key={item.key} data-measure-item><span>{item.glyph}</span>{item.label}</span>)}</div><div className="top-nav-items">{visible.map((item) => <button key={item.key} data-nav-key={item.key} className={`top-nav-action${value === item.key ? ' active' : ''}`} aria-current={value === item.key ? 'page' : undefined} tabIndex={value === item.key || (!visible.some((candidate) => candidate.key === value) && item === visible[0]) ? 0 : -1} onClick={() => { onChange(item.key); setOpen(false) }}><span aria-hidden="true">{item.glyph}</span><b>{item.label}</b></button>)}{overflow.length > 0 && <button ref={moreRef} className={`top-nav-more${overflowActive ? ' active' : ''}`} aria-label="更多导航" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((current) => !current)}>•••</button>}</div>{open && overflow.length > 0 && <><button className="top-nav-scrim" aria-label="关闭更多导航" onClick={() => setOpen(false)} /><div ref={menuRef} className="top-nav-overflow" role="menu" onKeyDown={menuKey}>{overflow.map((item) => <button key={item.key} data-nav-key={item.key} role="menuitem" className={value === item.key ? 'active' : ''} onClick={() => { onChange(item.key); setOpen(false); requestAnimationFrame(() => moreRef.current?.focus()) }}><span aria-hidden="true">{item.glyph}</span><b>{item.label}</b></button>)}</div></>}</nav>
+  }}><div ref={measureRef} className="top-nav-measure" aria-hidden="true">{items.map((item) => <span key={item.key} data-measure-item><span>{item.glyph}</span>{item.label}</span>)}</div><div className="top-nav-items">{visible.map((item) => <button key={item.key} data-nav-key={item.key} className={`top-nav-action${value === item.key ? ' active' : ''}`} aria-current={value === item.key ? 'page' : undefined} tabIndex={rovingKey === item.key ? 0 : -1} onFocus={() => setFocusKey(item.key)} onClick={() => { setFocusKey(item.key); onChange(item.key); setOpen(false) }}><span aria-hidden="true">{item.glyph}</span><b>{item.label}</b></button>)}{overflow.length > 0 && <button ref={moreRef} className={`top-nav-more${overflowActive ? ' active' : ''}`} aria-label="更多导航" aria-haspopup="menu" aria-expanded={open} tabIndex={rovingKey === '__more__' ? 0 : -1} onFocus={() => setFocusKey('__more__')} onClick={() => setOpen((current) => !current)}>•••</button>}</div>{open && overflow.length > 0 && <><button className="top-nav-scrim" aria-label="关闭更多导航" onClick={() => setOpen(false)} /><div ref={menuRef} className="top-nav-overflow" role="menu" onKeyDown={menuKey}>{overflow.map((item) => <button key={item.key} data-nav-key={item.key} role="menuitem" className={value === item.key ? 'active' : ''} onClick={() => { setFocusKey(item.key); onChange(item.key); setOpen(false); focusPrimaryOrMore(item.key) }}><span aria-hidden="true">{item.glyph}</span><b>{item.label}</b></button>)}</div></>}</nav>
 }
 
 function OverlayNavigationView<T extends string>({ items, value, onChange, open, source, onUserOpenChange, onNavigationOpenChange, minimal = false, hierarchical = false, hierarchy }: { items: NavItem<T>[]; value: T; onChange: (value: T) => void; open: boolean; source: PaneChangeSource; onUserOpenChange: (value: boolean) => void; onNavigationOpenChange: (value: boolean) => void; minimal?: boolean; hierarchical?: boolean; hierarchy?: NavigationNode<T>[] }) {
+  const roots = hierarchical ? (hierarchy ?? items.map(toLeaf)) : items.map(toLeaf)
   const [path, setPath] = useState<NavigationNode<T>[]>([])
   const [pathDirection, setPathDirection] = useState<PathDirection>('neutral')
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(['group-features']))
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(activeBranchIds(roots, value)))
   const paneRef = useRef<HTMLElement>(null)
   const railRef = useRef<HTMLElement>(null)
   const toggleRef = useRef<HTMLButtonElement>(null)
   const openerRef = useRef<HTMLElement | null>(null)
   const focusRequestRef = useRef(0)
   const pendingPathResetRef = useRef(false)
-  const roots = hierarchical ? (hierarchy ?? items.map(toLeaf)) : items.map(toLeaf)
   const currentNodes = path.length ? path[path.length - 1]?.children ?? [] : roots
   const currentTitle = path[path.length - 1]?.label ?? 'UWP LAB'
   const paneViewKey = path.map((node) => node.id).join('/') || 'root'
+  const activeBranchKey = activeBranchIds(roots, value).join('\u0000')
 
   const queueFocus = (work: () => void) => {
     const request = ++focusRequestRef.current
@@ -389,6 +473,17 @@ function OverlayNavigationView<T extends string>({ items, value, onChange, open,
       setPath([])
     }
   }, [hierarchical, path.length])
+
+  useEffect(() => {
+    if (!activeBranchKey) return
+    const ids = activeBranchKey.split('\u0000')
+    setExpanded((current) => {
+      if (ids.every((id) => current.has(id))) return current
+      const next = new Set(current)
+      ids.forEach((id) => next.add(id))
+      return next
+    })
+  }, [activeBranchKey])
 
   const visibleActions = (host: HTMLElement) => Array.from(host.querySelectorAll<HTMLButtonElement>('.overlay-tree-action')).filter((button) => button.offsetParent !== null)
 
