@@ -37,21 +37,6 @@ function toLeaf<T extends string>(item: NavItem<T>): NavigationNode<T> {
   return { id: `item-${item.key}`, key: item.key, label: item.label, glyph: item.glyph }
 }
 
-function demoHierarchy<T extends string>(items: NavItem<T>[]): NavigationNode<T>[] {
-  const byKey = new Map(items.map((item) => [String(item.key), item]))
-  const start = byKey.get('start')
-  const controls = byKey.get('controls')
-  const views = byKey.get('views')
-  const patterns = byKey.get('patterns')
-  const settings = byKey.get('settings')
-  if (!start || !controls || !views || !patterns || !settings) return items.map(toLeaf)
-  return [
-    toLeaf(start),
-    { id: 'group-features', label: '功能', glyph: '▤', children: [toLeaf(controls), toLeaf(views), toLeaf(patterns)] },
-    toLeaf(settings),
-  ]
-}
-
 function nodeIsActive<T extends string>(node: NavigationNode<T>, value: T): boolean {
   return node.key === value || Boolean(node.children?.some((child) => nodeIsActive(child, value)))
 }
@@ -203,7 +188,7 @@ export function AdaptiveNavigationView<T extends string>({ items, value, onChang
   const resolved = normalizeMode(mode, autoMode)
   const history = useNavigationHistory(value, onChange)
   const pane = usePaneLifecycle(resolved)
-  const explicitHierarchy = hierarchy ?? demoHierarchy(items)
+  const explicitHierarchy = hierarchy ?? items.map(toLeaf)
 
   useLayoutEffect(() => {
     const app = scopeRef.current?.closest<HTMLElement>('.app')
