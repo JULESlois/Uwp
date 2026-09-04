@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import type { Command } from './components'
 import { CommandIcon, commandIconFromGlyph, type CommandIconName } from './command-icons'
+import { useStableElementWidth } from './measurement'
 
 export type PriorityCommand = Omit<Command, 'glyph'> & {
   glyph?: string
@@ -57,45 +58,38 @@ export function PriorityCommandBar({ commands }: { commands: PriorityCommand[] }
   const [visibleIndices, setVisibleIndices] = useState<number[]>(() => commands.map((_, index) => index))
   const [overflowOpen, setOverflowOpen] = useState(false)
   const signature = commands.map((command) => `${command.label}:${command.disabled ? 1 : 0}:${command.priority ?? 'primary'}:${command.icon ?? ''}:${command.glyph ?? ''}`).join('|')
+  const stableWidth = useStableElementWidth(host, { hysteresis: 8, settleDelay: 120 })
 
   useEffect(() => {
     const root = host.current
     if (!root) return
-    const measure = () => {
-      const widths = Array.from(root.querySelectorAll<HTMLElement>('[data-command-measure]')).map((item) => item.offsetWidth)
-      const allIndices = commands.map((_, index) => index)
-      const total = widths.reduce((sum, width) => sum + width, 0)
-      const available = root.clientWidth
-      if (!widths.length || total <= available) {
-        setVisibleIndices(allIndices)
-        return
-      }
-
-      const overflowReserve = 52
-      const budget = Math.max(0, available - overflowReserve)
-      const visible = new Set(allIndices)
-      let used = total
-
-      const removeUntilFit = (indices: number[]) => {
-        for (const index of indices) {
-          if (used <= budget || visible.size <= 1) break
-          if (!visible.has(index)) continue
-          visible.delete(index)
-          used -= widths[index] ?? 0
-        }
-      }
-
-      removeUntilFit(allIndices.filter((index) => commands[index]?.priority === 'secondary').reverse())
-      removeUntilFit(allIndices.filter((index) => visible.has(index)).reverse())
-      setVisibleIndices(allIndices.filter((index) => visible.has(index)))
+    const widths = Array.from(root.querySelectorAll<HTMLElement>('[data-command-measure]')).map((item) => item.offsetWidth)
+    const allIndices = commands.map((_, index) => index)
+    const total = widths.reduce((sum, width) => sum + width, 0)
+    const available = stableWidth || root.clientWidth
+    if (!widths.length || total <= available) {
+      setVisibleIndices(allIndices)
+      return
     }
 
-    measure()
-    if (typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver(measure)
-    observer.observe(root)
-    return () => observer.disconnect()
-  }, [commands.length, signature])
+    const overflowReserve = 52
+    const budget = Math.max(0, available - overflowReserve)
+    const visible = new Set(allIndices)
+    let used = total
+
+    const removeUntilFit = (indices: number[]) => {
+      for (const index of indices) {
+        if (used <= budget || visible.size <= 1) break
+        if (!visible.has(index)) continue
+        visible.delete(index)
+        used -= widths[index] ?? 0
+      }
+    }
+
+    removeUntilFit(allIndices.filter((index) => commands[index]?.priority === 'secondary').reverse())
+    removeUntilFit(allIndices.filter((index) => visible.has(index)).reverse())
+    setVisibleIndices(allIndices.filter((index) => visible.has(index)))
+  }, [commands.length, signature, stableWidth])
 
   useEffect(() => {
     if (!overflowOpen) return
