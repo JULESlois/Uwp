@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import type { Command } from './components'
 import { CommandIcon, commandIconFromGlyph, type CommandIconName } from './command-icons'
-import { allocatePriorityIndices, readMeasuredWidths, useStableElementWidth } from './measurement'
+import { allocatePriorityIndices, useMeasuredItemWidths } from './measurement'
 
 export type PriorityCommand = Omit<Command, 'glyph'> & {
   glyph?: string
   icon?: CommandIconName
   priority?: 'primary' | 'secondary'
 }
+
+type CommandFocusKey = number | '__more__'
 
 function iconFor(command: PriorityCommand) {
   return command.icon ?? commandIconFromGlyph(command.glyph)
@@ -51,67 +53,105 @@ function CommandGlyph({ command }: { command: PriorityCommand }) {
   return <span className="priority-command-icon" aria-hidden="true">{icon ? <CommandIcon name={icon} /> : <span className="priority-command-fallback">{command.glyph}</span>}</span>
 }
 
-function sameIndices(a: readonly number[], b: readonly number[]) {
-  return a.length === b.length && a.every((value, index) => value === b[index])
-}
-
 export function PriorityCommandBar({ commands }: { commands: PriorityCommand[] }) {
   const host = useRef<HTMLDivElement>(null)
+  const measureRef = useRef<HTMLDivElement>(null)
   const overflowTrigger = useRef<HTMLButtonElement>(null)
   const overflowMenu = useRef<HTMLDivElement>(null)
-  const [visibleIndices, setVisibleIndices] = useState<number[]>(() => commands.map((_, index) => index))
+  const firstEnabledIndex = Math.max(0, commands.findIndex((command) => !command.disabled))
+  const [focusKey, setFocusKey] = useState<CommandFocusKey>(firstEnabledIndex)
   const [overflowOpen, setOverflowOpen] = useState(false)
   const signature = commands.map((command) => `${command.label}:${command.disabled ? 1 : 0}:${command.priority ?? 'primary'}:${command.icon ?? ''}:${command.glyph ?? ''}`).join('|')
-  const stableWidth = useStableElementWidth(host, { hysteresis: 8, settleDelay: 120 })
+  const priorities = useMemo(() => commands.map((command) => command.priority ?? 'primary'), [signature])
+  const { widths, availableWidth } = useMeasuredItemWidths(host, measureRef, {
+    selector: '[data-command-measure]',
+    signature,
+    hysteresis: 8,
+    settleDelay: 120,
+  })
 
-  useEffect(() => {
-    const root = host.current
-    if (!root) return
-
-    const calculate = () => {
-      const widths = readMeasuredWidths(root, '[data-command-measure]')
-      const available = stableWidth || root.clientWidth
-      const priorities = commands.map((command) => command.priority ?? 'primary')
-      const next = allocatePriorityIndices(widths, available, priorities, { overflowReserve: 52, minVisible: 1 })
-      setVisibleIndices((current) => sameIndices(current, next) ? current : next)
-    }
-
-    calculate()
-    let cancelled = false
-    document.fonts?.ready.then(() => {
-      if (!cancelled) calculate()
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [commands.length, signature, stableWidth])
+  const visibleIndices = useMemo(() => {
+    if (widths.length !== commands.length) return commands.map((_, index) => index)
+    return allocatePriorityIndices(widths, availableWidth, priorities, { overflowReserve: 52, minVisible: 1 })
+  }, [availableWidth, commands.length, priorities, widths])
+  const visibleSet = useMemo(() => new Set(visibleIndices), [visibleIndices])
+  const shown = commands.map((command, index) => ({ command, index })).filter(({ index }) => visibleSet.has(index))
+  const overflow = commands.map((command, index) => ({ command, index })).filter(({ index }) => !visibleSet.has(index))
+  const firstEnabledShown = shown.find(({ command }) => !command.disabled)
+  const focusIsVisible = typeof focusKey === 'number' && visibleSet.has(focusKey) && !commands[focusKey]?.disabled
+  const rovingKey: CommandFocusKey | null = focusIsVisible
+    ? focusKey
+    : focusKey === '__more__' && overflow.length > 0
+      ? '__more__'
+      : firstEnabledShown?.index ?? (overflow.length > 0 ? '__more__' : null)
+  const visibleSignature = visibleIndices.join(',')
 
   useEffect(() => {
     if (!overflowOpen) return
     requestAnimationFrame(() => overflowMenu.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus())
   }, [overflowOpen])
 
-  const visibleSet = useMemo(() => new Set(visibleIndices), [visibleIndices])
-  const shown = commands.map((command, index) => ({ command, index })).filter(({ index }) => visibleSet.has(index))
-  const overflow = commands.map((command, index) => ({ command, index })).filter(({ index }) => !visibleSet.has(index))
+  useEffect(() => {
+    if (overflow.length) return
+    setOverflowOpen(false)
+  }, [overflow.length])
 
   useEffect(() => {
-    if (!overflow.length) setOverflowOpen(false)
-  }, [overflow.length])
+    const root = host.current
+    const toolbar = root?.querySelector<HTMLElement>('.priority-commandbar')
+    const active = document.activeElement
+    if (!root || !toolbar || !(active instanceof HTMLElement) || !toolbar.contains(active)) return
+
+    if (typeof focusKey === 'number' && !visibleSet.has(focusKey)) {
+      if (overflow.length > 0 && overflowTrigger.current) {
+        setFocusKey('__more__')
+        requestAnimationFrame(() => overflowTrigger.current?.focus())
+        return
+      }
+      if (firstEnabledShown) {
+        setFocusKey(firstEnabledShown.index)
+        requestAnimationFrame(() => root.querySelector<HTMLButtonElement>(`[data-command-index="${firstEnabledShown.index}"]`)?.focus())
+      }
+      return
+    }
+
+    if (focusKey === '__more__' && overflow.length === 0 && firstEnabledShown) {
+      setFocusKey(firstEnabledShown.index)
+      requestAnimationFrame(() => root.querySelector<HTMLButtonElement>(`[data-command-index="${firstEnabledShown.index}"]`)?.focus())
+    }
+  }, [firstEnabledShown, focusKey, overflow.length, visibleSet, visibleSignature])
+
+  const restoreToolbarFocus = () => {
+    requestAnimationFrame(() => {
+      if (overflowTrigger.current && overflow.length > 0) {
+        setFocusKey('__more__')
+        overflowTrigger.current.focus()
+        return
+      }
+      if (!firstEnabledShown) return
+      setFocusKey(firstEnabledShown.index)
+      host.current?.querySelector<HTMLButtonElement>(`[data-command-index="${firstEnabledShown.index}"]`)?.focus()
+    })
+  }
 
   const closeOverflow = () => {
     setOverflowOpen(false)
-    requestAnimationFrame(() => overflowTrigger.current?.focus())
+    restoreToolbarFocus()
   }
 
   return <div ref={host} className="priority-command-shell">
-    <div className="priority-commandbar" role="toolbar" aria-label="命令栏" onKeyDown={focusToolbar}>
-      {shown.map(({ command, index }) => <button data-roving="true" key={`${command.label}-${index}`} className={`priority-command-action ${command.priority === 'secondary' ? 'secondary' : 'primary'}`} disabled={command.disabled} onClick={command.onClick}><CommandGlyph command={command} /><b>{command.label}</b></button>)}
+    <div className="priority-commandbar" role="toolbar" aria-label="命令栏" aria-orientation="horizontal" onKeyDown={focusToolbar}>
+      {shown.map(({ command, index }) => <button data-roving="true" data-command-index={index} key={`${command.label}-${index}`} className={`priority-command-action ${command.priority === 'secondary' ? 'secondary' : 'primary'}`} disabled={command.disabled} tabIndex={rovingKey === index ? 0 : -1} onFocus={() => setFocusKey(index)} onClick={command.onClick}><CommandGlyph command={command} /><b>{command.label}</b></button>)}
       {overflow.length > 0 && <span className="priority-command-overflow-host">
-        <button ref={overflowTrigger} data-roving="true" className="priority-command-more" aria-label="更多命令" aria-haspopup="menu" aria-expanded={overflowOpen} onClick={() => setOverflowOpen((value) => !value)}><span className="priority-command-icon" aria-hidden="true"><CommandIcon name="more" /></span></button>
-        {overflowOpen && <><button className="priority-command-scrim" aria-label="关闭更多命令" onClick={closeOverflow} /><div ref={overflowMenu} className="priority-command-overflow" role="menu" onKeyDown={(event) => focusOverflow(event, closeOverflow)}>{overflow.map(({ command, index }) => <button key={`${command.label}-${index}`} role="menuitem" disabled={command.disabled} onClick={() => { command.onClick?.(); setOverflowOpen(false) }}><CommandGlyph command={command} /><b>{command.label}</b></button>)}</div></>}
+        <button ref={overflowTrigger} data-roving="true" className="priority-command-more" aria-label="更多命令" aria-haspopup="menu" aria-expanded={overflowOpen} tabIndex={rovingKey === '__more__' ? 0 : -1} onFocus={() => setFocusKey('__more__')} onClick={() => setOverflowOpen((value) => !value)}><span className="priority-command-icon" aria-hidden="true"><CommandIcon name="more" /></span></button>
+        {overflowOpen && <><button className="priority-command-scrim" aria-label="关闭更多命令" onClick={closeOverflow} /><div ref={overflowMenu} className="priority-command-overflow" role="menu" onKeyDown={(event) => focusOverflow(event, closeOverflow)}>{overflow.map(({ command, index }) => <button key={`${command.label}-${index}`} role="menuitem" disabled={command.disabled} onClick={() => {
+          command.onClick?.()
+          const shouldRestore = overflowMenu.current?.contains(document.activeElement) ?? false
+          setOverflowOpen(false)
+          if (shouldRestore) restoreToolbarFocus()
+        }}><CommandGlyph command={command} /><b>{command.label}</b></button>)}</div></>}
       </span>}
     </div>
-    <div className="priority-command-measure" aria-hidden="true">{commands.map((command, index) => <span key={`${command.label}-${index}`} data-command-measure><CommandGlyph command={command} /><b>{command.label}</b></span>)}</div>
+    <div ref={measureRef} className="priority-command-measure" aria-hidden="true">{commands.map((command, index) => <span key={`${command.label}-${index}`} data-command-measure><CommandGlyph command={command} /><b>{command.label}</b></span>)}</div>
   </div>
 }
