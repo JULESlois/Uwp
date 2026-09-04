@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { AcrylicPane, AppBar, AutoSuggestBox, CharmBar, ComboBox, ContentDialog, ContextMenu, EdgeAppBar, Flyout, MasterDetailsView, Pivot, RadioButton, RevealSurface, SemanticZoom, SettingsPane, SnapView, SplitView, TeachingTip, Tile, ToggleSwitch, type ListItem, type NavItem } from './components'
 import { SelectionGridView, SelectionListView, type CollectionTransfer, type SelectionMode } from './collections'
 import { PriorityCommandBar, type PriorityCommand } from './commands'
-import { AdaptiveNavigationView, type NavigationPaneMode } from './navigation'
+import { AdaptiveNavigationView, type NavigationNode, type NavigationPaneMode } from './navigation'
 import { CheckBox } from './selectors'
 
 type Page = 'start' | 'controls' | 'views' | 'patterns' | 'settings'
@@ -16,6 +16,21 @@ const pages: NavItem<Page>[] = [
   { key: 'views', glyph: '▤', label: '视图' },
   { key: 'patterns', glyph: '◫', label: '模式' },
   { key: 'settings', glyph: '⚙', label: '设置' },
+]
+
+const pageHierarchy: NavigationNode<Page>[] = [
+  { id: 'page-start', key: 'start', glyph: '⌂', label: '开始' },
+  {
+    id: 'group-features',
+    glyph: '▤',
+    label: '功能',
+    children: [
+      { id: 'page-controls', key: 'controls', glyph: '☷', label: '控件' },
+      { id: 'page-views', key: 'views', glyph: '▤', label: '视图' },
+      { id: 'page-patterns', key: 'patterns', glyph: '◫', label: '模式' },
+    ],
+  },
+  { id: 'page-settings', key: 'settings', glyph: '⚙', label: '设置' },
 ]
 
 const pageOrder: Page[] = ['start', 'controls', 'views', 'patterns', 'settings']
@@ -158,5 +173,5 @@ export default function App() {
     return <SettingsPage dark={dark} setDark={setDark} motion={motion} setMotion={setMotion} compact={compact} setCompact={setCompact} highContrast={highContrast} setHighContrast={setHighContrast} navMode={navMode} setNavMode={setNavMode} />
   }
 
-  return <div className={`app ${dark ? 'dark' : 'light'} ${era} nav-${navMode} ${motion ? '' : 'no-motion'} ${compact ? 'compact' : ''} ${highContrast ? 'high-contrast' : ''}`} data-nav-direction={navDirection} data-page={page}>{era === 'win10' && <AdaptiveNavigationView items={pages} value={page} onChange={navigate} mode={navMode} />}{era === 'win8' && <><CharmBar open={charms} onOpen={() => { setCharms(true); setEdgeAppBar(false) }} onClose={() => setCharms(false)} onSelect={charmSelect} /><EdgeAppBar open={edgeAppBar} onOpen={() => { setEdgeAppBar(true); setCharms(false) }} onClose={() => setEdgeAppBar(false)} commands={edgeCommands} /></>}<main className="shell"><header className="topbar"><h1 key={page} className="page-title-transition">{pages.find((item) => item.key === page)?.label}</h1><div className="era-switch" role="group" aria-label="设计年代"><button className={era === 'win8' ? 'active' : ''} onClick={() => switchEra('win8')}>Windows 8</button><button className={era === 'win10' ? 'active' : ''} onClick={() => switchEra('win10')}>Windows 10</button></div></header>{era === 'win10' && <PriorityCommandBar commands={win10Commands} />}<div className={`page-transition-stage ${pageTransition ? 'transitioning' : ''}`}>{pageTransition && <div key={pageTransition.from} className="page-transition-layer outgoing" aria-hidden="true">{renderPage(pageTransition.from)}</div>}<div key={page} className={`page-transition-layer ${pageTransition ? 'incoming' : 'settled'}`} onAnimationEnd={(event) => { const target = event.target as HTMLElement; if (!target.classList.contains('page-enter')) return; setPageTransition((current) => current?.to === page ? null : current) }}>{renderPage(page)}</div></div></main></div>
+  return <div className={`app ${dark ? 'dark' : 'light'} ${era} nav-${navMode} ${motion ? '' : 'no-motion'} ${compact ? 'compact' : ''} ${highContrast ? 'high-contrast' : ''}`} data-nav-direction={navDirection} data-page={page}>{era === 'win10' && <AdaptiveNavigationView items={pages} hierarchy={pageHierarchy} value={page} onChange={navigate} mode={navMode} />}{era === 'win8' && <><CharmBar open={charms} onOpen={() => { setCharms(true); setEdgeAppBar(false) }} onClose={() => setCharms(false)} onSelect={charmSelect} /><EdgeAppBar open={edgeAppBar} onOpen={() => { setEdgeAppBar(true); setCharms(false) }} onClose={() => setEdgeAppBar(false)} commands={edgeCommands} /></>}<main className="shell"><header className="topbar"><h1 key={page} className="page-title-transition">{pages.find((item) => item.key === page)?.label}</h1><div className="era-switch" role="group" aria-label="设计年代"><button className={era === 'win8' ? 'active' : ''} onClick={() => switchEra('win8')}>Windows 8</button><button className={era === 'win10' ? 'active' : ''} onClick={() => switchEra('win10')}>Windows 10</button></div></header>{era === 'win10' && <PriorityCommandBar commands={win10Commands} />}<div className={`page-transition-stage ${pageTransition ? 'transitioning' : ''}`}>{pageTransition && <div key={pageTransition.from} className="page-transition-layer outgoing" aria-hidden="true">{renderPage(pageTransition.from)}</div>}<div key={page} className={`page-transition-layer ${pageTransition ? 'incoming' : 'settled'}`} onAnimationEnd={(event) => { const target = event.target as HTMLElement; if (!target.classList.contains('page-enter')) return; setPageTransition((current) => current?.to === page ? null : current) }}>{renderPage(page)}</div></div></main></div>
 }
