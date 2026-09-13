@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import './combobox.css'
 
 export type ComboBoxOption<T extends string = string> = {
   value: T

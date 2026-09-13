@@ -5,6 +5,7 @@ import { menuKeyDown, toolbarKeyDown } from './focus-utils'
 import { trapModalFocus, useFocusReturn } from './focus-lifecycle'
 import { Button } from './button'
 export { Flyout, TeachingTip } from './anchored-surfaces'
+export { ComboBox, type ComboBoxOption, type ComboBoxProps } from './combobox'
 
 export type NavItem<T extends string> = { key: T; glyph: string; label: string }
 export type PaneMode = 'auto' | 'compact' | 'expanded'
@@ -120,10 +121,6 @@ export function Pivot<T extends string>({ tabs, value, onChange }: { tabs: Array
 
 export function RadioButton({ checked, onChange, label, name, value, stopPropagation = false, disabled = false }: { checked: boolean; onChange: () => void; label?: ReactNode; name?: string; value?: string; stopPropagation?: boolean; disabled?: boolean }) {
   return <label className={`selector radio-selector${disabled ? ' disabled' : ''}`} onClick={(event) => stopPropagation && event.stopPropagation()}><input type="radio" checked={checked} disabled={disabled} name={name} value={value} onChange={onChange} /><span className="selector-mark" aria-hidden="true" />{label && <span className="selector-label">{label}</span>}</label>
-}
-
-export function ComboBox({ label, value, onChange, options, disabled = false }: { label: string; value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }>; disabled?: boolean }) {
-  return <label className={`field-label${disabled ? ' disabled' : ''}`}>{label}<span className="select-shell"><select value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select><i aria-hidden="true">⌄</i></span></label>
 }
 
 export function ToggleSwitch({ checked, onChange, label, detail, disabled = false }: { checked: boolean; onChange: (value: boolean) => void; label: string; detail?: string; disabled?: boolean }) {
