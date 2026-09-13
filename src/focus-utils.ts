@@ -2,7 +2,9 @@ import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 
 function interactive(root: HTMLElement | null, selector: string) {
   if (!root) return [] as HTMLElement[]
-  return Array.from(root.querySelectorAll<HTMLElement>(selector)).filter((element) => !element.hasAttribute('disabled'))
+  return Array.from(root.querySelectorAll<HTMLElement>(selector)).filter(
+    (element) => !element.hasAttribute('disabled') && element.getAttribute('aria-disabled') !== 'true',
+  )
 }
 
 function moveFocus(root: HTMLElement | null, selector: string, current: HTMLElement, delta: number) {
@@ -18,7 +20,7 @@ function focusBoundary(root: HTMLElement | null, selector: string, end: boolean)
 }
 
 export function menuKeyDown(event: ReactKeyboardEvent<HTMLElement>, onEscape?: () => void) {
-  const selector = 'button:not(:disabled),[role="menuitem"]'
+  const selector = '[role="menuitem"]:not(:disabled),[role="option"]:not(:disabled),button:not(:disabled)'
   if (event.key === 'ArrowDown') { event.preventDefault(); moveFocus(event.currentTarget, selector, event.target as HTMLElement, 1) }
   if (event.key === 'ArrowUp') { event.preventDefault(); moveFocus(event.currentTarget, selector, event.target as HTMLElement, -1) }
   if (event.key === 'Home') { event.preventDefault(); focusBoundary(event.currentTarget, selector, false) }
