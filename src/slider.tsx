@@ -31,6 +31,7 @@ export function Slider({
   const inputId = id ?? generatedId
   const [uncontrolledValue, setUncontrolledValue] = useState(defaultValue ?? Number(min))
   const currentValue = value ?? uncontrolledValue
+  const resolvedDefaultValue = defaultValue ?? Number(min)
   const minValue = Number(min)
   const maxValue = Number(max)
   const span = maxValue - minValue
@@ -58,7 +59,7 @@ export function Slider({
       max={max}
       step={step}
       value={value}
-      defaultValue={defaultValue}
+      defaultValue={value === undefined ? resolvedDefaultValue : undefined}
       disabled={disabled}
       style={inputStyle}
       onChange={handleChange}
