@@ -1,63 +1,17 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { CommandIcon, commandIconFromGlyph, type CommandIconName } from './command-icons'
 import { runInternalSlide, runLayoutFlip, useLayerPresence } from './internal-motion'
+import { enabledElements, menuKeyDown, toolbarKeyDown } from './focus-utils'
+export { Flyout, TeachingTip } from './anchored-surfaces'
 
 export type NavItem<T extends string> = { key: T; glyph: string; label: string }
 export type PaneMode = 'auto' | 'compact' | 'expanded'
 export type Command = { label: string; glyph?: string; icon?: CommandIconName; onClick?: () => void; primary?: boolean; disabled?: boolean }
 export type ListItem = { key: string; title: string; detail?: string; glyph?: string; disabled?: boolean }
 
-type AnchoredPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end'
-
-function enabledElements(root: HTMLElement | null, selector: string) {
-  if (!root) return [] as HTMLElement[]
-  return Array.from(root.querySelectorAll<HTMLElement>(selector)).filter((element) => !element.hasAttribute('disabled') && element.getAttribute('aria-disabled') !== 'true')
-}
-
-function focusRelative(root: HTMLElement | null, selector: string, current: HTMLElement, delta: number) {
-  const items = enabledElements(root, selector)
-  if (!items.length) return
-  const currentIndex = Math.max(0, items.indexOf(current))
-  items[(currentIndex + delta + items.length) % items.length]?.focus()
-}
-
-function focusEdge(root: HTMLElement | null, selector: string, edge: 'start' | 'end') {
-  const items = enabledElements(root, selector)
-  ;(edge === 'start' ? items[0] : items[items.length - 1])?.focus()
-}
-
-function menuKeyDown(event: ReactKeyboardEvent<HTMLElement>, onEscape?: () => void) {
-  const selector = '[role="menuitem"]:not(:disabled),[role="option"]:not(:disabled),button:not(:disabled)'
-  if (event.key === 'ArrowDown') { event.preventDefault(); focusRelative(event.currentTarget, selector, event.target as HTMLElement, 1) }
-  if (event.key === 'ArrowUp') { event.preventDefault(); focusRelative(event.currentTarget, selector, event.target as HTMLElement, -1) }
-  if (event.key === 'Home') { event.preventDefault(); focusEdge(event.currentTarget, selector, 'start') }
-  if (event.key === 'End') { event.preventDefault(); focusEdge(event.currentTarget, selector, 'end') }
-  if (event.key === 'Escape') { event.preventDefault(); onEscape?.() }
-}
-
-function toolbarKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
-  const selector = '[data-roving="true"]:not(:disabled)'
-  if (event.key === 'ArrowRight') { event.preventDefault(); focusRelative(event.currentTarget, selector, event.target as HTMLElement, 1) }
-  if (event.key === 'ArrowLeft') { event.preventDefault(); focusRelative(event.currentTarget, selector, event.target as HTMLElement, -1) }
-  if (event.key === 'Home') { event.preventDefault(); focusEdge(event.currentTarget, selector, 'start') }
-  if (event.key === 'End') { event.preventDefault(); focusEdge(event.currentTarget, selector, 'end') }
-}
-
 function CommandVisual({ command, className = 'command-icon-slot' }: { command: Pick<Command, 'glyph' | 'icon'>; className?: string }) {
   const icon = command.icon ?? commandIconFromGlyph(command.glyph)
   return <span className={className} aria-hidden="true">{icon ? <CommandIcon name={icon} /> : <span className="command-icon-fallback">{command.glyph}</span>}</span>
-}
-
-function resolveAnchoredPlacement(host: HTMLElement | null, floating: HTMLElement | null): AnchoredPlacement {
-  if (!host || !floating || typeof window === 'undefined') return 'bottom-start'
-  const anchor = host.getBoundingClientRect()
-  const surface = floating.getBoundingClientRect()
-  const below = window.innerHeight - anchor.bottom
-  const above = anchor.top
-  const vertical = below >= Math.min(surface.height + 12, above) ? 'bottom' : 'top'
-  const roomToRight = window.innerWidth - anchor.left
-  const horizontal = roomToRight >= surface.width + 12 ? 'start' : 'end'
-  return `${vertical}-${horizontal}` as AnchoredPlacement
 }
 
 export function CommandBar({ commands }: { commands: Command[] }) {
@@ -190,37 +144,6 @@ export function AutoSuggestBox({ value, onChange, suggestions, placeholder = '�
   }} /></span>{!disabled && open && value && matches.length > 0 && <div id={listId} className="autosuggest-menu" role="listbox">{matches.map((item, index) => <button id={optionId(index)} className={index === activeIndex ? 'active' : ''} key={item} role="option" aria-selected={index === activeIndex} tabIndex={-1} onMouseDown={(event) => event.preventDefault()} onMouseEnter={() => setActiveIndex(index)} onClick={() => choose(item)}>{item}</button>)}</div>}</div>
 }
 
-export function Flyout({ open, onClose, anchor, children }: { open: boolean; onClose: () => void; anchor: ReactNode; children: ReactNode }) {
-  const host = useRef<HTMLSpanElement>(null)
-  const flyoutRef = useRef<HTMLDivElement>(null)
-  const returnFocus = useRef<HTMLElement | null>(null)
-  const wasOpen = useRef(false)
-  const [placement, setPlacement] = useState<AnchoredPlacement>('bottom-start')
-  const presence = useLayerPresence(open)
-
-  useLayoutEffect(() => {
-    if (!presence.mounted) return
-    setPlacement(resolveAnchoredPlacement(host.current, flyoutRef.current))
-  }, [presence.mounted, open])
-
-  useEffect(() => {
-    if (open && !wasOpen.current) {
-      returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
-      requestAnimationFrame(() => flyoutRef.current?.querySelector<HTMLElement>('[role="menuitem"]:not(:disabled),button:not(:disabled)')?.focus())
-    } else if (!open && wasOpen.current) {
-      requestAnimationFrame(() => returnFocus.current?.focus())
-    }
-    wasOpen.current = open
-  }, [open])
-
-  const close = () => onClose()
-
-  return <span ref={host} className="flyout-anchor">{anchor}{presence.mounted && <>
-    <button className={`flyout-scrim internal-popover-scrim${open ? ' active' : ''}`} aria-label="关闭弹出菜单" tabIndex={open ? 0 : -1} onClick={close} />
-    <div ref={flyoutRef} className={`flyout internal-popover placement-${placement}${presence.entered ? ' entered' : ''}`} role="menu" aria-hidden={!open} onKeyDown={(event) => { if (open) menuKeyDown(event, close) }} onTransitionEnd={(event) => { if (event.target !== flyoutRef.current || event.propertyName !== 'transform' || open) return; presence.finishExit() }}>{children}</div>
-  </>}</span>
-}
-
 export function ContentDialog({ open, title, children, onClose }: { open: boolean; title: string; children: ReactNode; onClose: () => void }) {
   const titleId = useId()
   const dialogRef = useRef<HTMLElement>(null)
@@ -351,20 +274,6 @@ export function RevealSurface({ children }: { children: ReactNode }) {
 
 export function AcrylicPane({ children }: { children: ReactNode }) {
   return <div className="acrylic-pane">{children}</div>
-}
-
-export function TeachingTip({ open, title, children, anchor, onClose }: { open: boolean; title: string; children: ReactNode; anchor: ReactNode; onClose: () => void }) {
-  const hostRef = useRef<HTMLSpanElement>(null)
-  const tipRef = useRef<HTMLDivElement>(null)
-  const [placement, setPlacement] = useState<AnchoredPlacement>('bottom-start')
-  const presence = useLayerPresence(open)
-
-  useLayoutEffect(() => {
-    if (!presence.mounted) return
-    setPlacement(resolveAnchoredPlacement(hostRef.current, tipRef.current))
-  }, [presence.mounted, open])
-
-  return <span ref={hostRef} className="teaching-anchor">{anchor}{presence.mounted && <div ref={tipRef} className={`teaching-tip internal-popover placement-${placement}${presence.entered ? ' entered' : ''}`} role="status" aria-hidden={!open} onTransitionEnd={(event) => { if (event.target !== tipRef.current || event.propertyName !== 'transform' || open) return; presence.finishExit() }}><button className="teaching-close" tabIndex={open ? 0 : -1} aria-label="关闭提示" onClick={onClose}><span className="teaching-close-icon" aria-hidden="true"><CommandIcon name="close" /></span></button><strong>{title}</strong><div>{children}</div></div>}</span>
 }
 
 export function CharmBar({ open, onOpen, onClose, onSelect }: { open: boolean; onOpen: () => void; onClose: () => void; onSelect: (command: string) => void }) {
