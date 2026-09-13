@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject, type ReactNode } from 'react'
 import { CommandIcon } from './command-icons'
 import { menuKeyDown } from './focus-utils'
 import { useLayerPresence } from './internal-motion'
@@ -17,18 +17,42 @@ function resolvePlacement(host: HTMLElement | null, floating: HTMLElement | null
   return `${vertical}-${horizontal}` as AnchoredPlacement
 }
 
+function useAnchoredPlacement(
+  host: RefObject<HTMLElement | null>,
+  surface: RefObject<HTMLElement | null>,
+  mounted: boolean,
+) {
+  const [placement, setPlacement] = useState<AnchoredPlacement>('bottom-start')
+
+  useLayoutEffect(() => {
+    if (!mounted || typeof window === 'undefined') return
+
+    const update = () => setPlacement(resolvePlacement(host.current, surface.current))
+    update()
+
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update)
+    if (host.current) observer?.observe(host.current)
+    if (surface.current) observer?.observe(surface.current)
+    window.addEventListener('resize', update)
+    window.addEventListener('scroll', update, true)
+
+    return () => {
+      observer?.disconnect()
+      window.removeEventListener('resize', update)
+      window.removeEventListener('scroll', update, true)
+    }
+  }, [host, mounted, surface])
+
+  return placement
+}
+
 export function Flyout({ open, onClose, anchor, children }: { open: boolean; onClose: () => void; anchor: ReactNode; children: ReactNode }) {
   const host = useRef<HTMLSpanElement>(null)
   const surface = useRef<HTMLDivElement>(null)
   const returnFocus = useRef<HTMLElement | null>(null)
   const wasOpen = useRef(false)
-  const [placement, setPlacement] = useState<AnchoredPlacement>('bottom-start')
   const presence = useLayerPresence(open)
-
-  useLayoutEffect(() => {
-    if (!presence.mounted) return
-    setPlacement(resolvePlacement(host.current, surface.current))
-  }, [presence.mounted, open])
+  const placement = useAnchoredPlacement(host, surface, presence.mounted)
 
   useEffect(() => {
     if (open && !wasOpen.current) {
@@ -49,13 +73,8 @@ export function Flyout({ open, onClose, anchor, children }: { open: boolean; onC
 export function TeachingTip({ open, title, children, anchor, onClose }: { open: boolean; title: string; children: ReactNode; anchor: ReactNode; onClose: () => void }) {
   const host = useRef<HTMLSpanElement>(null)
   const surface = useRef<HTMLDivElement>(null)
-  const [placement, setPlacement] = useState<AnchoredPlacement>('bottom-start')
   const presence = useLayerPresence(open)
-
-  useLayoutEffect(() => {
-    if (!presence.mounted) return
-    setPlacement(resolvePlacement(host.current, surface.current))
-  }, [presence.mounted, open])
+  const placement = useAnchoredPlacement(host, surface, presence.mounted)
 
   return <span ref={host} className="teaching-anchor">{anchor}{presence.mounted && <div ref={surface} className={`teaching-tip internal-popover placement-${placement}${presence.entered ? ' entered' : ''}`} role="status" aria-hidden={!open} onTransitionEnd={(event) => { if (event.target !== surface.current || event.propertyName !== 'transform' || open) return; presence.finishExit() }}><button className="teaching-close" tabIndex={open ? 0 : -1} aria-label="关闭提示" onClick={onClose}><span className="teaching-close-icon" aria-hidden="true"><CommandIcon name="close" /></span></button><strong>{title}</strong><div>{children}</div></div>}</span>
 }
