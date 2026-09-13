@@ -1,7 +1,7 @@
 import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from 'react'
 import { enabledElements } from './focus-utils'
 
-const focusableSelector = 'button:not(:disabled),input:not(:disabled),select:not(:disabled),[tabindex]:not([tabindex="-1"])'
+const focusableSelector = 'button:not(:disabled),input:not([type="hidden"]):not(:disabled),select:not(:disabled),textarea:not(:disabled),a[href],[contenteditable="true"],[tabindex]:not([tabindex="-1"])'
 
 export function useFocusReturn(open: boolean, surface: RefObject<HTMLElement | null>, initialSelector = 'button:not(:disabled)') {
   const returnFocus = useRef<HTMLElement | null>(null)
