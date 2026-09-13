@@ -3,6 +3,7 @@ import { CommandIcon, commandIconFromGlyph, type CommandIconName } from './comma
 import { runInternalSlide, runLayoutFlip, useLayerPresence } from './internal-motion'
 import { menuKeyDown, toolbarKeyDown } from './focus-utils'
 import { trapModalFocus, useFocusReturn } from './focus-lifecycle'
+import { Button } from './button'
 export { Flyout, TeachingTip } from './anchored-surfaces'
 
 export type NavItem<T extends string> = { key: T; glyph: string; label: string }
@@ -155,7 +156,7 @@ export function ContentDialog({ open, title, children, onClose }: { open: boolea
   const close = () => onClose()
   const trap = (event: ReactKeyboardEvent<HTMLElement>) => { if (open) trapModalFocus(event, dialogRef.current, close) }
 
-  return <div className={`dialog-layer internal-layer${open ? ' active' : ''}${presence.entered ? ' entered' : ''}`} role="presentation" aria-hidden={!open}><button className="dialog-scrim" aria-label="关闭对话框" tabIndex={open ? 0 : -1} onClick={close} /><section ref={dialogRef} className="dialog" role="dialog" aria-modal={open || undefined} aria-labelledby={titleId} onKeyDown={trap} onTransitionEnd={(event) => { if (event.target !== dialogRef.current || event.propertyName !== 'transform' || open) return; presence.finishExit() }}><h2 id={titleId}>{title}</h2><div>{children}</div><footer><button className="button accent" tabIndex={open ? 0 : -1} onClick={close}>确定</button><button className="button" tabIndex={open ? 0 : -1} onClick={close}>取消</button></footer></section></div>
+  return <div className={`dialog-layer internal-layer${open ? ' active' : ''}${presence.entered ? ' entered' : ''}`} role="presentation" aria-hidden={!open}><button className="dialog-scrim" aria-label="关闭对话框" tabIndex={open ? 0 : -1} onClick={close} /><section ref={dialogRef} className="dialog" role="dialog" aria-modal={open || undefined} aria-labelledby={titleId} onKeyDown={trap} onTransitionEnd={(event) => { if (event.target !== dialogRef.current || event.propertyName !== 'transform' || open) return; presence.finishExit() }}><h2 id={titleId}>{title}</h2><div>{children}</div><footer><Button variant="accent" tabIndex={open ? 0 : -1} onClick={close}>确定</Button><Button tabIndex={open ? 0 : -1} onClick={close}>取消</Button></footer></section></div>
 }
 
 export function SettingsPane({ open, title, onClose, children }: { open: boolean; title: string; onClose: () => void; children: ReactNode }) {
