@@ -1,7 +1,8 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { CommandIcon, commandIconFromGlyph, type CommandIconName } from './command-icons'
 import { runInternalSlide, runLayoutFlip, useLayerPresence } from './internal-motion'
-import { enabledElements, menuKeyDown, toolbarKeyDown } from './focus-utils'
+import { menuKeyDown, toolbarKeyDown } from './focus-utils'
+import { trapModalFocus, useFocusReturn } from './focus-lifecycle'
 export { Flyout, TeachingTip } from './anchored-surfaces'
 
 export type NavItem<T extends string> = { key: T; glyph: string; label: string }
@@ -147,77 +148,23 @@ export function AutoSuggestBox({ value, onChange, suggestions, placeholder = '�
 export function ContentDialog({ open, title, children, onClose }: { open: boolean; title: string; children: ReactNode; onClose: () => void }) {
   const titleId = useId()
   const dialogRef = useRef<HTMLElement>(null)
-  const returnFocus = useRef<HTMLElement | null>(null)
-  const wasOpen = useRef(false)
-  const focusVersion = useRef(0)
   const presence = useLayerPresence(open)
-
-  useEffect(() => {
-    const version = ++focusVersion.current
-    if (open && !wasOpen.current) {
-      returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
-      requestAnimationFrame(() => {
-        if (focusVersion.current === version) dialogRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus()
-      })
-    } else if (!open && wasOpen.current) {
-      requestAnimationFrame(() => {
-        if (focusVersion.current === version) returnFocus.current?.focus()
-      })
-    }
-    wasOpen.current = open
-  }, [open])
+  useFocusReturn(open, dialogRef)
 
   if (!presence.mounted) return null
   const close = () => onClose()
-  const trap = (event: ReactKeyboardEvent<HTMLElement>) => {
-    if (!open) return
-    if (event.key === 'Escape') { event.preventDefault(); close(); return }
-    if (event.key !== 'Tab') return
-    const focusable = enabledElements(dialogRef.current, 'button:not(:disabled),input:not(:disabled),select:not(:disabled),[tabindex]:not([tabindex="-1"])')
-    if (!focusable.length) return
-    const first = focusable[0]!
-    const last = focusable[focusable.length - 1]!
-    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
-    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
-  }
+  const trap = (event: ReactKeyboardEvent<HTMLElement>) => { if (open) trapModalFocus(event, dialogRef.current, close) }
 
   return <div className={`dialog-layer internal-layer${open ? ' active' : ''}${presence.entered ? ' entered' : ''}`} role="presentation" aria-hidden={!open}><button className="dialog-scrim" aria-label="关闭对话框" tabIndex={open ? 0 : -1} onClick={close} /><section ref={dialogRef} className="dialog" role="dialog" aria-modal={open || undefined} aria-labelledby={titleId} onKeyDown={trap} onTransitionEnd={(event) => { if (event.target !== dialogRef.current || event.propertyName !== 'transform' || open) return; presence.finishExit() }}><h2 id={titleId}>{title}</h2><div>{children}</div><footer><button className="button accent" tabIndex={open ? 0 : -1} onClick={close}>确定</button><button className="button" tabIndex={open ? 0 : -1} onClick={close}>取消</button></footer></section></div>
 }
 
 export function SettingsPane({ open, title, onClose, children }: { open: boolean; title: string; onClose: () => void; children: ReactNode }) {
   const paneRef = useRef<HTMLElement>(null)
-  const returnFocus = useRef<HTMLElement | null>(null)
-  const wasOpen = useRef(false)
-  const focusVersion = useRef(0)
   const presence = useLayerPresence(open)
-
-  useEffect(() => {
-    const version = ++focusVersion.current
-    if (open && !wasOpen.current) {
-      returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
-      requestAnimationFrame(() => {
-        if (focusVersion.current === version) paneRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus()
-      })
-    } else if (!open && wasOpen.current) {
-      requestAnimationFrame(() => {
-        if (focusVersion.current === version) returnFocus.current?.focus()
-      })
-    }
-    wasOpen.current = open
-  }, [open])
+  useFocusReturn(open, paneRef)
 
   if (!presence.mounted) return null
-  const trap = (event: ReactKeyboardEvent<HTMLElement>) => {
-    if (!open) return
-    if (event.key === 'Escape') { event.preventDefault(); onClose(); return }
-    if (event.key !== 'Tab') return
-    const focusable = enabledElements(paneRef.current, 'button:not(:disabled),input:not(:disabled),select:not(:disabled),[tabindex]:not([tabindex="-1"])')
-    if (!focusable.length) return
-    const first = focusable[0]!
-    const last = focusable[focusable.length - 1]!
-    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
-    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
-  }
+  const trap = (event: ReactKeyboardEvent<HTMLElement>) => { if (open) trapModalFocus(event, paneRef.current, onClose) }
 
   return <div className={`settings-layer internal-layer${open ? ' active' : ''}${presence.entered ? ' entered' : ''}`} aria-hidden={!open}><button className="settings-scrim" aria-label="关闭设置面板" tabIndex={open ? 0 : -1} onClick={onClose} /><aside ref={paneRef} className="settings-pane" aria-label={title} onKeyDown={trap} onTransitionEnd={(event) => { if (event.target !== paneRef.current || event.propertyName !== 'transform' || open) return; presence.finishExit() }}><header><button className="settings-pane-back" tabIndex={open ? 0 : -1} onClick={onClose} aria-label="返回"><span className="settings-back-icon" aria-hidden="true"><CommandIcon name="back" /></span></button><h2>{title}</h2></header>{children}</aside></div>
 }
