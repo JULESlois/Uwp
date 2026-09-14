@@ -72,8 +72,15 @@ export function CommandBar({
   </div>
 }
 
-export function AppBar({ commands, className = '' }: { commands: Command[]; className?: string }) {
-  return <div className={`appbar ${className}`.trim()} role="toolbar" aria-label="应用栏" onKeyDown={toolbarKeyDown}>{commands.map((command, index) => <button data-roving="true" tabIndex={index === 0 ? 0 : -1} key={command.label} disabled={command.disabled} onClick={command.onClick}><CommandVisual command={command} className="appbar-icon" /><b>{command.label}</b></button>)}</div>
+export type AppBarProps = {
+  commands: Command[]
+  className?: string
+  ariaLabel?: string
+}
+
+export function AppBar({ commands, className = '', ariaLabel = '应用栏' }: AppBarProps) {
+  const firstEnabledIndex = commands.findIndex((command) => !command.disabled)
+  return <div className={`appbar ${className}`.trim()} role="toolbar" aria-label={ariaLabel} onKeyDown={toolbarKeyDown}>{commands.map((command, index) => <button data-roving="true" tabIndex={index === firstEnabledIndex ? 0 : -1} key={command.label} disabled={command.disabled} onClick={command.onClick}><CommandVisual command={command} className="appbar-icon" /><b>{command.label}</b></button>)}</div>
 }
 
 export function EdgeAppBar({ open, onOpen, onClose, commands }: { open: boolean; onOpen: () => void; onClose: () => void; commands: Command[] }) {
