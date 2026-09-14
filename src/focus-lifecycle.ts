@@ -1,5 +1,6 @@
 import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from 'react'
 import { enabledElements } from './focus-utils'
+import { modalTabTarget } from './modal-focus'
 
 const focusableSelector = 'button:not(:disabled),input:not([type="hidden"]):not(:disabled),select:not(:disabled),textarea:not(:disabled),a[href],[contenteditable="true"],[tabindex]:not([tabindex="-1"])'
 
@@ -40,13 +41,11 @@ export function trapModalFocus(
   const focusable = enabledElements(surface, focusableSelector)
   if (!focusable.length) return
 
-  const first = focusable[0]!
-  const last = focusable[focusable.length - 1]!
-  if (event.shiftKey && document.activeElement === first) {
-    event.preventDefault()
-    last.focus()
-  } else if (!event.shiftKey && document.activeElement === last) {
-    event.preventDefault()
-    first.focus()
-  }
+  const activeIndex = focusable.findIndex((element) => element === document.activeElement)
+  const target = modalTabTarget(focusable.length, activeIndex, event.shiftKey)
+  if (!target) return
+
+  event.preventDefault()
+  const next = target === 'first' ? focusable[0] : focusable[focusable.length - 1]
+  next?.focus()
 }
