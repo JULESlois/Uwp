@@ -20,7 +20,19 @@ function CommandVisual({ command, className = 'command-icon-slot' }: { command: 
   return <span className={className} aria-hidden="true">{icon ? <CommandIcon name={icon} /> : <span className="command-icon-fallback">{command.glyph}</span>}</span>
 }
 
-export function CommandBar({ commands }: { commands: Command[] }) {
+export type CommandBarProps = {
+  commands: Command[]
+  ariaLabel?: string
+  overflowLabel?: string
+  overflowCloseLabel?: string
+}
+
+export function CommandBar({
+  commands,
+  ariaLabel = '命令栏',
+  overflowLabel = '更多命令',
+  overflowCloseLabel = '关闭更多命令',
+}: CommandBarProps) {
   const host = useRef<HTMLDivElement>(null)
   const overflowTrigger = useRef<HTMLButtonElement>(null)
   const overflowMenu = useRef<HTMLDivElement>(null)
@@ -47,13 +59,15 @@ export function CommandBar({ commands }: { commands: Command[] }) {
 
   const shown = commands.slice(0, visibleCount)
   const overflow = commands.slice(visibleCount)
+  const firstEnabledIndex = shown.findIndex((command) => !command.disabled)
+  const overflowIsTabStop = firstEnabledIndex < 0 && overflow.length > 0
   const closeOverflow = () => { setOverflowOpen(false); requestAnimationFrame(() => overflowTrigger.current?.focus()) }
 
-  return <div ref={host} className="commandbar" role="toolbar" aria-label="命令栏" onKeyDown={toolbarKeyDown}>
-    {shown.map((command) => <button data-roving="true" key={command.label} disabled={command.disabled} className={command.primary ? 'primary' : ''} onClick={command.onClick}><CommandVisual command={command} /><b>{command.label}</b></button>)}
+  return <div ref={host} className="commandbar" role="toolbar" aria-label={ariaLabel} onKeyDown={toolbarKeyDown}>
+    {shown.map((command, index) => <button data-roving="true" tabIndex={index === firstEnabledIndex ? 0 : -1} key={command.label} disabled={command.disabled} className={command.primary ? 'primary' : ''} onClick={command.onClick}><CommandVisual command={command} /><b>{command.label}</b></button>)}
     {overflow.length > 0 && <span className="command-overflow-host">
-      <button ref={overflowTrigger} data-roving="true" className="command-overflow-trigger" aria-haspopup="menu" aria-expanded={overflowOpen} aria-label="更多命令" onClick={() => setOverflowOpen((value) => !value)}><span className="command-icon-slot" aria-hidden="true"><CommandIcon name="more" /></span><b>更多</b></button>
-      {overflowOpen && <><button className="command-overflow-scrim" aria-label="关闭更多命令" onClick={() => setOverflowOpen(false)} /><div ref={overflowMenu} className="command-overflow-menu" role="menu" onKeyDown={(event) => menuKeyDown(event, closeOverflow)}>{overflow.map((command) => <button key={command.label} role="menuitem" disabled={command.disabled} onClick={() => { command.onClick?.(); setOverflowOpen(false) }}><CommandVisual command={command} /><b>{command.label}</b></button>)}</div></>}
+      <button ref={overflowTrigger} data-roving="true" tabIndex={overflowIsTabStop ? 0 : -1} className="command-overflow-trigger" aria-haspopup="menu" aria-expanded={overflowOpen} aria-label={overflowLabel} onClick={() => setOverflowOpen((value) => !value)}><span className="command-icon-slot" aria-hidden="true"><CommandIcon name="more" /></span><b>更多</b></button>
+      {overflowOpen && <><button className="command-overflow-scrim" aria-label={overflowCloseLabel} onClick={() => setOverflowOpen(false)} /><div ref={overflowMenu} className="command-overflow-menu" role="menu" onKeyDown={(event) => menuKeyDown(event, closeOverflow)}>{overflow.map((command) => <button key={command.label} role="menuitem" disabled={command.disabled} onClick={() => { command.onClick?.(); setOverflowOpen(false) }}><CommandVisual command={command} /><b>{command.label}</b></button>)}</div></>}
     </span>}
   </div>
 }
