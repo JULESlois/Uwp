@@ -4,6 +4,7 @@ import { runInternalSlide, runLayoutFlip, useLayerPresence } from './internal-mo
 import { menuKeyDown, toolbarKeyDown } from './focus-utils'
 import { trapModalFocus, useFocusReturn } from './focus-lifecycle'
 import { Button } from './button'
+import { RadioButton } from './selectors'
 import { getPivotNavigationTarget } from './pivot-navigation'
 export { Flyout, TeachingTip } from './anchored-surfaces'
 export { ComboBox, type ComboBoxOption, type ComboBoxProps } from './combobox'
@@ -240,7 +241,8 @@ export function RevealSurface({ children }: { children: ReactNode }) {
 }
 
 export function AcrylicPane({ children }: { children: ReactNode }) {
-  return <div className="acrylic-pane">{children}</div>}
+  return <div className="acrylic-pane">{children}</div>
+}
 
 export function CharmBar({ open, onOpen, onClose, onSelect }: { open: boolean; onOpen: () => void; onClose: () => void; onSelect: (command: string) => void }) {
   const commands: Array<{ key: string; icon: CommandIconName; label: string }> = [{ key: 'search', icon: 'search', label: '搜索' }, { key: 'share', icon: 'share', label: '共享' }, { key: 'start', icon: 'start', label: '开始' }, { key: 'devices', icon: 'devices', label: '设备' }, { key: 'settings', icon: 'settings', label: '设置' }]
