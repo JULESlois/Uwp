@@ -138,7 +138,7 @@ export function Calendar({
         <button type="button" aria-label="下个月" disabled={disabled || nextMonthDisabled} onClick={() => navigateMonth(1)}>›</button>
       </div>
     </header>
-    <div ref={gridRef} className="calendar__grid" role="grid" aria-labelledby={titleId} aria-rowcount={6} aria-colcount={7}>
+    <div ref={gridRef} className="calendar__grid" role="grid" aria-labelledby={titleId} aria-rowcount={7} aria-colcount={7}>
       <div className="calendar__weekdays" role="row">{weekdays.map((day, index) => <span key={`${day}-${index}`} role="columnheader">{day}</span>)}</div>
       {weeks.map((week, rowIndex) => <div className="calendar__row" role="row" key={`${viewMonth.getFullYear()}-${viewMonth.getMonth()}-${rowIndex}`}>
         {week.map((date) => {
