@@ -7,6 +7,7 @@ import { Button } from './button'
 import { getPivotNavigationTarget } from './pivot-navigation'
 export { Flyout, TeachingTip } from './anchored-surfaces'
 export { ComboBox, type ComboBoxOption, type ComboBoxProps } from './combobox'
+export { RadioButton, ToggleSwitch, type RadioButtonProps, type ToggleSwitchProps } from './selectors'
 
 export type NavItem<T extends string> = { key: T; glyph: string; label: string }
 export type PaneMode = 'auto' | 'compact' | 'expanded'
@@ -118,14 +119,6 @@ export function Pivot<T extends string>({ tabs, value, onChange }: { tabs: Array
     }}>{tab.label}</button>)}
     <span ref={indicatorRef} className="pivot-indicator" aria-hidden="true" />
   </div>
-}
-
-export function RadioButton({ checked, onChange, label, name, value, stopPropagation = false, disabled = false }: { checked: boolean; onChange: () => void; label?: ReactNode; name?: string; value?: string; stopPropagation?: boolean; disabled?: boolean }) {
-  return <label className={`selector radio-selector${disabled ? ' disabled' : ''}`} onClick={(event) => stopPropagation && event.stopPropagation()}><input type="radio" checked={checked} disabled={disabled} name={name} value={value} onChange={onChange} /><span className="selector-mark" aria-hidden="true" />{label && <span className="selector-label">{label}</span>}</label>
-}
-
-export function ToggleSwitch({ checked, onChange, label, detail, disabled = false }: { checked: boolean; onChange: (value: boolean) => void; label: string; detail?: string; disabled?: boolean }) {
-  return <label className={`setting-row${disabled ? ' disabled' : ''}`}><span><strong>{label}</strong>{detail && <small>{detail}</small>}</span><input type="checkbox" checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} /><i className="switch" aria-hidden="true"><b /></i></label>
 }
 
 export function AutoSuggestBox({ value, onChange, suggestions, placeholder = '搜索', disabled = false }: { value: string; onChange: (value: string) => void; suggestions: string[]; placeholder?: string; disabled?: boolean }) {
@@ -247,8 +240,7 @@ export function RevealSurface({ children }: { children: ReactNode }) {
 }
 
 export function AcrylicPane({ children }: { children: ReactNode }) {
-  return <div className="acrylic-pane">{children}</div>
-}
+  return <div className="acrylic-pane">{children}</div>}
 
 export function CharmBar({ open, onOpen, onClose, onSelect }: { open: boolean; onOpen: () => void; onClose: () => void; onSelect: (command: string) => void }) {
   const commands: Array<{ key: string; icon: CommandIconName; label: string }> = [{ key: 'search', icon: 'search', label: '搜索' }, { key: 'share', icon: 'share', label: '共享' }, { key: 'start', icon: 'start', label: '开始' }, { key: 'devices', icon: 'devices', label: '设备' }, { key: 'settings', icon: 'settings', label: '设置' }]
