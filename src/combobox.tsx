@@ -1,6 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
 import './combobox.css'
 import { calculateComboPopupLayout, type ComboPopupPlacement } from './combobox-layout'
+import { getComboInitialActiveIndex, getNextComboActiveIndex } from './combobox-navigation'
 
 export type ComboBoxOption<T extends string = string> = {
   value: T
@@ -43,12 +44,11 @@ export function ComboBox<T extends string>({
   const [popupPlacement, setPopupPlacement] = useState<ComboPopupPlacement>('below')
   const [popupMaxHeight, setPopupMaxHeight] = useState<number>()
   const selectedIndex = options.findIndex((option) => option.value === value)
-  const [activeIndex, setActiveIndex] = useState(() => Math.max(0, selectedIndex))
-
   const enabledIndices = useMemo(
     () => options.map((option, index) => option.disabled ? -1 : index).filter((index) => index >= 0),
     [options],
   )
+  const [activeIndex, setActiveIndex] = useState(() => getComboInitialActiveIndex(selectedIndex, enabledIndices))
 
   useEffect(() => {
     if (!open || disabled) return
@@ -65,8 +65,7 @@ export function ComboBox<T extends string>({
 
   useEffect(() => {
     if (!open) return
-    const selected = selectedIndex >= 0 && !options[selectedIndex]?.disabled ? selectedIndex : enabledIndices[0] ?? 0
-    setActiveIndex(selected)
+    setActiveIndex(getComboInitialActiveIndex(selectedIndex, enabledIndices))
   }, [enabledIndices, open, options, selectedIndex])
 
   useLayoutEffect(() => {
@@ -102,10 +101,7 @@ export function ComboBox<T extends string>({
   const optionId = (index: number) => `${listId}-option-${index}`
 
   const move = (delta: number) => {
-    if (!enabledIndices.length) return
-    const position = enabledIndices.indexOf(activeIndex)
-    const origin = position >= 0 ? position : 0
-    setActiveIndex(enabledIndices[(origin + delta + enabledIndices.length) % enabledIndices.length]!)
+    setActiveIndex((current) => getNextComboActiveIndex(enabledIndices, current, delta))
   }
 
   const choose = (index: number) => {
@@ -149,12 +145,12 @@ export function ComboBox<T extends string>({
     }
     if (event.key === 'Home' && open) {
       event.preventDefault()
-      setActiveIndex(enabledIndices[0] ?? 0)
+      setActiveIndex(enabledIndices[0] ?? -1)
       return
     }
     if (event.key === 'End' && open) {
       event.preventDefault()
-      setActiveIndex(enabledIndices[enabledIndices.length - 1] ?? 0)
+      setActiveIndex(enabledIndices[enabledIndices.length - 1] ?? -1)
       return
     }
     if (event.key === 'Enter' || event.key === ' ') {
@@ -188,7 +184,7 @@ export function ComboBox<T extends string>({
       aria-controls={listId}
       aria-expanded={open}
       aria-haspopup="listbox"
-      aria-activedescendant={open && options[activeIndex] ? optionId(activeIndex) : undefined}
+      aria-activedescendant={open && activeIndex >= 0 && options[activeIndex] && !options[activeIndex]?.disabled ? optionId(activeIndex) : undefined}
       disabled={disabled}
       onClick={() => setOpen((current) => !current)}
       onKeyDown={onKeyDown}
