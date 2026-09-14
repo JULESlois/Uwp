@@ -1,4 +1,5 @@
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { nextRovingIndex } from './focus-navigation'
 
 function interactive(root: HTMLElement | null, selector: string) {
   if (!root) return [] as HTMLElement[]
@@ -9,9 +10,9 @@ function interactive(root: HTMLElement | null, selector: string) {
 
 function moveFocus(root: HTMLElement | null, selector: string, current: HTMLElement, delta: number) {
   const items = interactive(root, selector)
-  if (!items.length) return
-  const index = Math.max(0, items.indexOf(current))
-  items[(index + delta + items.length) % items.length]?.focus()
+  const index = nextRovingIndex(items.length, items.indexOf(current), delta)
+  if (index < 0) return
+  items[index]?.focus()
 }
 
 function focusBoundary(root: HTMLElement | null, selector: string, end: boolean) {
