@@ -84,7 +84,7 @@ export function ComboBox<T extends string>({
       const nextPlacement: PopupPlacement = below < preferredHeight && above > below ? 'above' : 'below'
       const available = nextPlacement === 'above' ? above : below
       setPopupPlacement(nextPlacement)
-      setPopupMaxHeight(Math.max(96, Math.min(300, available)))
+      setPopupMaxHeight(Math.min(300, Math.max(0, available)))
     }
 
     updatePlacement()
