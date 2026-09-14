@@ -144,7 +144,31 @@ export function AutoSuggestBox({ value, onChange, suggestions, placeholder = '�
   }} /></span>{!disabled && open && value && matches.length > 0 && <div id={listId} className="autosuggest-menu" role="listbox">{matches.map((item, index) => <button id={optionId(index)} className={index === activeIndex ? 'active' : ''} key={item} role="option" aria-selected={index === activeIndex} tabIndex={-1} onMouseDown={(event) => event.preventDefault()} onMouseEnter={() => setActiveIndex(index)} onClick={() => choose(item)}>{item}</button>)}</div>}</div>
 }
 
-export function ContentDialog({ open, title, children, onClose }: { open: boolean; title: string; children: ReactNode; onClose: () => void }) {
+export type ContentDialogProps = {
+  open: boolean
+  title: string
+  children: ReactNode
+  onClose: () => void
+  primaryButtonText?: ReactNode
+  secondaryButtonText?: ReactNode
+  primaryButtonDisabled?: boolean
+  secondaryButtonDisabled?: boolean
+  onPrimaryButtonClick?: () => void
+  onSecondaryButtonClick?: () => void
+}
+
+export function ContentDialog({
+  open,
+  title,
+  children,
+  onClose,
+  primaryButtonText = '确定',
+  secondaryButtonText = '取消',
+  primaryButtonDisabled = false,
+  secondaryButtonDisabled = false,
+  onPrimaryButtonClick,
+  onSecondaryButtonClick,
+}: ContentDialogProps) {
   const titleId = useId()
   const dialogRef = useRef<HTMLElement>(null)
   const presence = useLayerPresence(open)
@@ -152,9 +176,13 @@ export function ContentDialog({ open, title, children, onClose }: { open: boolea
 
   if (!presence.mounted) return null
   const close = () => onClose()
+  const runAction = (action?: () => void) => {
+    action?.()
+    close()
+  }
   const trap = (event: ReactKeyboardEvent<HTMLElement>) => { if (open) trapModalFocus(event, dialogRef.current, close) }
 
-  return <div className={`dialog-layer internal-layer${open ? ' active' : ''}${presence.entered ? ' entered' : ''}`} role="presentation" aria-hidden={!open}><button className="dialog-scrim" aria-label="关闭对话框" tabIndex={open ? 0 : -1} onClick={close} /><section ref={dialogRef} className="dialog" role="dialog" aria-modal={open || undefined} aria-labelledby={titleId} onKeyDown={trap} onTransitionEnd={(event) => { if (event.target !== dialogRef.current || event.propertyName !== 'transform' || open) return; presence.finishExit() }}><h2 id={titleId}>{title}</h2><div>{children}</div><footer><Button variant="accent" tabIndex={open ? 0 : -1} onClick={close}>确定</Button><Button tabIndex={open ? 0 : -1} onClick={close}>取消</Button></footer></section></div>
+  return <div className={`dialog-layer internal-layer${open ? ' active' : ''}${presence.entered ? ' entered' : ''}`} role="presentation" aria-hidden={!open}><button className="dialog-scrim" aria-label="关闭对话框" tabIndex={open ? 0 : -1} onClick={close} /><section ref={dialogRef} className="dialog" role="dialog" aria-modal={open || undefined} aria-labelledby={titleId} onKeyDown={trap} onTransitionEnd={(event) => { if (event.target !== dialogRef.current || event.propertyName !== 'transform' || open) return; presence.finishExit() }}><h2 id={titleId}>{title}</h2><div>{children}</div><footer>{primaryButtonText != null && <Button variant="accent" tabIndex={open ? 0 : -1} disabled={primaryButtonDisabled} onClick={() => runAction(onPrimaryButtonClick)}>{primaryButtonText}</Button>}{secondaryButtonText != null && <Button tabIndex={open ? 0 : -1} disabled={secondaryButtonDisabled} onClick={() => runAction(onSecondaryButtonClick)}>{secondaryButtonText}</Button>}</footer></section></div>
 }
 
 export function SettingsPane({ open, title, onClose, children }: { open: boolean; title: string; onClose: () => void; children: ReactNode }) {
