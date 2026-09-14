@@ -52,8 +52,8 @@ export function Calendar({
   const controlled = value !== undefined
 
   useEffect(() => {
-    if (!value) return
-    const next = clampDate(value, min, max)
+    const next = clampDate(value ?? internalValue, min, max)
+    if (!sameDay(next, internalValue)) setInternalValue(next)
     setFocusedDate(next)
     setViewMonth(new Date(next.getFullYear(), next.getMonth(), 1))
   }, [value, min, max])
@@ -129,7 +129,7 @@ export function Calendar({
     setFocusedDate(nextFocus)
   }
 
-  return <section className={`calendar${disabled ? ' calendar--disabled' : ''}`} aria-labelledby={titleId}>
+  return <section className={`calendar${disabled ? ' calendar--disabled' : ''}`} aria-labelledby={titleId} aria-disabled={disabled || undefined}>
     <header className="calendar__header">
       <h3 id={titleId}>{label}</h3>
       <div className="calendar__month-nav">
