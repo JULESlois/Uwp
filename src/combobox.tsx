@@ -178,7 +178,7 @@ export function ComboBox<T extends string>({
   }
 
   const selected = options[selectedIndex]
-  const popupStyle: CSSProperties | undefined = popupMaxHeight ? { maxHeight: popupMaxHeight } : undefined
+  const popupStyle: CSSProperties | undefined = popupMaxHeight !== undefined ? { maxHeight: popupMaxHeight } : undefined
 
   return <div ref={rootRef} className={`combo-field${disabled ? ' disabled' : ''} ${className}`.trim()}>
     <span id={labelId} className="combo-label">{label}</span>
