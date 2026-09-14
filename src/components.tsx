@@ -4,6 +4,7 @@ import { runInternalSlide, runLayoutFlip, useLayerPresence } from './internal-mo
 import { menuKeyDown, toolbarKeyDown } from './focus-utils'
 import { trapModalFocus, useFocusReturn } from './focus-lifecycle'
 import { Button } from './button'
+import { getPivotNavigationTarget } from './pivot-navigation'
 export { Flyout, TeachingTip } from './anchored-surfaces'
 export { ComboBox, type ComboBoxOption, type ComboBoxProps } from './combobox'
 
@@ -110,10 +111,10 @@ export function Pivot<T extends string>({ tabs, value, onChange }: { tabs: Array
 
   return <div ref={root} className="pivot" role="tablist">
     {tabs.map((tab, index) => <button key={tab.key} role="tab" tabIndex={value === tab.key ? 0 : -1} aria-selected={value === tab.key} className={value === tab.key ? 'active' : ''} onClick={() => change(index)} onKeyDown={(event) => {
-      if (event.key === 'ArrowRight') { event.preventDefault(); activate((index + 1) % tabs.length, 'forward') }
-      if (event.key === 'ArrowLeft') { event.preventDefault(); activate((index - 1 + tabs.length) % tabs.length, 'backward') }
-      if (event.key === 'Home') { event.preventDefault(); activate(0, 'backward') }
-      if (event.key === 'End') { event.preventDefault(); activate(tabs.length - 1, 'forward') }
+      const target = getPivotNavigationTarget(index, tabs.length, event.key)
+      if (!target) return
+      event.preventDefault()
+      activate(target.index, target.direction)
     }}>{tab.label}</button>)}
     <span ref={indicatorRef} className="pivot-indicator" aria-hidden="true" />
   </div>
