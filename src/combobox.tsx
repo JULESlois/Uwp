@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
 import './combobox.css'
 
 export type ComboBoxOption<T extends string = string> = {
@@ -23,6 +23,8 @@ function optionText(option: ComboBoxOption) {
   return typeof option.label === 'string' || typeof option.label === 'number' ? String(option.label) : option.value
 }
 
+type PopupPlacement = 'above' | 'below'
+
 export function ComboBox<T extends string>({
   label,
   value,
@@ -35,9 +37,12 @@ export function ComboBox<T extends string>({
   const listId = useId()
   const labelId = useId()
   const rootRef = useRef<HTMLDivElement>(null)
+  const popupRef = useRef<HTMLDivElement>(null)
   const typeaheadRef = useRef('')
   const typeaheadTimer = useRef<number | null>(null)
   const [open, setOpen] = useState(false)
+  const [popupPlacement, setPopupPlacement] = useState<PopupPlacement>('below')
+  const [popupMaxHeight, setPopupMaxHeight] = useState<number>()
   const selectedIndex = options.findIndex((option) => option.value === value)
   const [activeIndex, setActiveIndex] = useState(() => Math.max(0, selectedIndex))
 
@@ -64,6 +69,37 @@ export function ComboBox<T extends string>({
     const selected = selectedIndex >= 0 && !options[selectedIndex]?.disabled ? selectedIndex : enabledIndices[0] ?? 0
     setActiveIndex(selected)
   }, [enabledIndices, open, options, selectedIndex])
+
+  useLayoutEffect(() => {
+    if (!open) return
+    const updatePlacement = () => {
+      const root = rootRef.current
+      if (!root) return
+      const rect = root.getBoundingClientRect()
+      const viewportPadding = 8
+      const gap = 4
+      const below = Math.max(0, window.innerHeight - rect.bottom - viewportPadding - gap)
+      const above = Math.max(0, rect.top - viewportPadding - gap)
+      const preferredHeight = Math.min(300, Math.max(152, popupRef.current?.scrollHeight ?? 0))
+      const nextPlacement: PopupPlacement = below < preferredHeight && above > below ? 'above' : 'below'
+      const available = nextPlacement === 'above' ? above : below
+      setPopupPlacement(nextPlacement)
+      setPopupMaxHeight(Math.max(96, Math.min(300, available)))
+    }
+
+    updatePlacement()
+    window.addEventListener('resize', updatePlacement)
+    window.addEventListener('scroll', updatePlacement, true)
+    return () => {
+      window.removeEventListener('resize', updatePlacement)
+      window.removeEventListener('scroll', updatePlacement, true)
+    }
+  }, [open, options.length])
+
+  useEffect(() => {
+    if (!open) return
+    popupRef.current?.querySelector<HTMLElement>(`[data-combo-index="${activeIndex}"]`)?.scrollIntoView({ block: 'nearest' })
+  }, [activeIndex, open])
 
   const optionId = (index: number) => `${listId}-option-${index}`
 
@@ -142,6 +178,7 @@ export function ComboBox<T extends string>({
   }
 
   const selected = options[selectedIndex]
+  const popupStyle: CSSProperties | undefined = popupMaxHeight ? { maxHeight: popupMaxHeight } : undefined
 
   return <div ref={rootRef} className={`combo-field${disabled ? ' disabled' : ''} ${className}`.trim()}>
     <span id={labelId} className="combo-label">{label}</span>
@@ -161,9 +198,17 @@ export function ComboBox<T extends string>({
       <span className={selected ? '' : 'combo-placeholder'}>{selected?.label ?? placeholder}</span>
       <span className="combo-chevron" aria-hidden="true">⌄</span>
     </button>
-    {open && !disabled && <div id={listId} className="combo-popup" role="listbox" aria-labelledby={labelId}>
+    {open && !disabled && <div
+      ref={popupRef}
+      id={listId}
+      className={`combo-popup combo-popup--${popupPlacement}`}
+      role="listbox"
+      aria-labelledby={labelId}
+      style={popupStyle}
+    >
       {options.map((option, index) => <button
         id={optionId(index)}
+        data-combo-index={index}
         key={option.value}
         type="button"
         role="option"
