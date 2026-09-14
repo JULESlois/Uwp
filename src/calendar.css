@@ -1,0 +1,23 @@
+.calendar{width:min(100%,360px);color:var(--text);background:var(--surface);border:1px solid color-mix(in srgb,var(--text) 26%,transparent)}
+.calendar__header{padding:14px 14px 10px}
+.calendar__header h3{margin:0 0 12px;font-size:14px;font-weight:600}
+.calendar__month-nav{display:grid;grid-template-columns:36px 1fr 36px;align-items:center;min-height:36px}
+.calendar__month-nav strong{text-align:center;font-size:16px;font-weight:500}
+.calendar__month-nav button{width:32px;height:32px;border:0;background:transparent;color:var(--text);font-size:24px;font-weight:300;line-height:1;cursor:pointer}
+.calendar__month-nav button:hover:not(:disabled){background:var(--hover)}
+.calendar__month-nav button:active:not(:disabled){background:color-mix(in srgb,var(--accent) 16%,var(--hover))}
+.calendar__grid{padding:0 8px 10px}
+.calendar__weekdays,.calendar__row{display:grid;grid-template-columns:repeat(7,1fr)}
+.calendar__weekdays{padding-bottom:4px}
+.calendar__weekdays span{display:grid;height:28px;place-items:center;font-size:11px;color:color-mix(in srgb,var(--text) 68%,transparent)}
+.calendar__cell{min-width:0}
+.calendar__day{position:relative;display:grid;width:100%;aspect-ratio:1;min-width:0;place-items:center;border:0;background:transparent;color:var(--text);font:inherit;cursor:pointer}
+.calendar__day:hover:not(:disabled){background:var(--hover)}
+.calendar__day:focus-visible{outline:2px solid var(--text);outline-offset:-3px}
+.calendar__day.is-outside{color:color-mix(in srgb,var(--text) 42%,transparent)}
+.calendar__day.is-today::after{content:"";position:absolute;left:50%;bottom:5px;width:4px;height:4px;transform:translateX(-50%);background:var(--accent)}
+.calendar__day.is-selected{color:#fff;background:var(--accent)}
+.calendar__day.is-selected.is-today::after{background:currentColor}
+.high-contrast .calendar__day.is-selected{color:#000}
+.calendar__day:disabled,.calendar--disabled{cursor:default;opacity:var(--disabled-opacity)}
+@media (forced-colors:active){.calendar{border-color:CanvasText}.calendar__day.is-selected{color:HighlightText;background:Highlight}.calendar__day.is-today::after{background:Highlight}.calendar__day:focus-visible{outline-color:CanvasText}}
