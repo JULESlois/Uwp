@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import './calendar.css'
+import { addDays, addMonths, clampDate, daysInMonth, moveMonthPreservingDay, sameDay, sameMonth, startOfDay } from './calendar-utils'
 
 export type CalendarProps = {
   value?: Date
@@ -11,23 +12,6 @@ export type CalendarProps = {
   firstDayOfWeek?: 0 | 1
   disabled?: boolean
   label?: string
-}
-
-const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
-const startOfDay = (value: Date) => new Date(value.getFullYear(), value.getMonth(), value.getDate())
-const addDays = (value: Date, amount: number) => new Date(value.getFullYear(), value.getMonth(), value.getDate() + amount)
-const addMonths = (value: Date, amount: number) => new Date(value.getFullYear(), value.getMonth() + amount, 1)
-const daysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate()
-const sameMonth = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth()
-const moveMonthPreservingDay = (value: Date, amount: number) => {
-  const month = new Date(value.getFullYear(), value.getMonth() + amount, 1)
-  return new Date(month.getFullYear(), month.getMonth(), Math.min(value.getDate(), daysInMonth(month.getFullYear(), month.getMonth())))
-}
-const clampDate = (value: Date, min?: Date, max?: Date) => {
-  const day = startOfDay(value)
-  if (min && day < startOfDay(min)) return startOfDay(min)
-  if (max && day > startOfDay(max)) return startOfDay(max)
-  return day
 }
 
 export function Calendar({
