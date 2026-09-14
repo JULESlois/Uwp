@@ -1,5 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
 import './combobox.css'
+import { calculateComboPopupLayout, type ComboPopupPlacement } from './combobox-layout'
 
 export type ComboBoxOption<T extends string = string> = {
   value: T
@@ -23,8 +24,6 @@ function optionText(option: ComboBoxOption) {
   return typeof option.label === 'string' || typeof option.label === 'number' ? String(option.label) : option.value
 }
 
-type PopupPlacement = 'above' | 'below'
-
 export function ComboBox<T extends string>({
   label,
   value,
@@ -41,7 +40,7 @@ export function ComboBox<T extends string>({
   const typeaheadRef = useRef('')
   const typeaheadTimer = useRef<number | null>(null)
   const [open, setOpen] = useState(false)
-  const [popupPlacement, setPopupPlacement] = useState<PopupPlacement>('below')
+  const [popupPlacement, setPopupPlacement] = useState<ComboPopupPlacement>('below')
   const [popupMaxHeight, setPopupMaxHeight] = useState<number>()
   const selectedIndex = options.findIndex((option) => option.value === value)
   const [activeIndex, setActiveIndex] = useState(() => Math.max(0, selectedIndex))
@@ -76,15 +75,14 @@ export function ComboBox<T extends string>({
       const root = rootRef.current
       if (!root) return
       const rect = root.getBoundingClientRect()
-      const viewportPadding = 8
-      const gap = 4
-      const below = Math.max(0, window.innerHeight - rect.bottom - viewportPadding - gap)
-      const above = Math.max(0, rect.top - viewportPadding - gap)
-      const preferredHeight = Math.min(300, Math.max(152, popupRef.current?.scrollHeight ?? 0))
-      const nextPlacement: PopupPlacement = below < preferredHeight && above > below ? 'above' : 'below'
-      const available = nextPlacement === 'above' ? above : below
-      setPopupPlacement(nextPlacement)
-      setPopupMaxHeight(Math.min(300, Math.max(0, available)))
+      const layout = calculateComboPopupLayout({
+        triggerTop: rect.top,
+        triggerBottom: rect.bottom,
+        viewportHeight: window.innerHeight,
+        popupScrollHeight: popupRef.current?.scrollHeight ?? 0,
+      })
+      setPopupPlacement(layout.placement)
+      setPopupMaxHeight(layout.maxHeight)
     }
 
     updatePlacement()
