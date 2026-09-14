@@ -1,0 +1,16 @@
+.checkbox-selector input:indeterminate + .selector-mark {
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.checkbox-selector input:indeterminate + .selector-mark::before {
+  content: '';
+  width: 10px;
+  height: 2px;
+  background: currentColor;
+}
+
+.high-contrast .checkbox-selector input:indeterminate + .selector-mark {
+  color: #000;
+}
