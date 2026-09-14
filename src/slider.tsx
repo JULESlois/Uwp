@@ -25,10 +25,13 @@ export function Slider({
   onChange,
   onValueChange,
   style,
+  'aria-label': ariaLabel,
+  'aria-labelledby': ariaLabelledBy,
   ...props
 }: SliderProps) {
   const generatedId = useId()
   const inputId = id ?? generatedId
+  const labelId = `${inputId}-label`
   const [uncontrolledValue, setUncontrolledValue] = useState(defaultValue ?? Number(min))
   const currentValue = value ?? uncontrolledValue
   const resolvedDefaultValue = defaultValue ?? Number(min)
@@ -37,6 +40,7 @@ export function Slider({
   const span = maxValue - minValue
   const progress = span > 0 ? Math.min(100, Math.max(0, ((currentValue - minValue) / span) * 100)) : 0
   const inputStyle = { ...style, '--slider-position': `${progress}%` } as CSSProperties
+  const resolvedAriaLabelledBy = ariaLabelledBy ?? (ariaLabel ? undefined : labelId)
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     const nextValue = event.currentTarget.valueAsNumber
@@ -47,7 +51,7 @@ export function Slider({
 
   return <label className={`slider-control${disabled ? ' disabled' : ''}`} htmlFor={inputId}>
     <span className="slider-header">
-      <span>{label}</span>
+      <span id={labelId}>{label}</span>
       {showValue && <output htmlFor={inputId}>{formatValue(currentValue)}</output>}
     </span>
     <input
@@ -62,6 +66,8 @@ export function Slider({
       defaultValue={value === undefined ? resolvedDefaultValue : undefined}
       disabled={disabled}
       style={inputStyle}
+      aria-label={ariaLabel}
+      aria-labelledby={resolvedAriaLabelledBy}
       onChange={handleChange}
     />
   </label>
