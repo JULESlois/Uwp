@@ -229,7 +229,7 @@ export function CharmBar({ open, onOpen, onClose, onSelect }: { open: boolean; o
 export function SnapView({ snapped, onChange }: { snapped: boolean; onChange: (value: boolean) => void }) {
   const rootRef = useRef<HTMLDivElement>(null)
   const toggle = () => runLayoutFlip(rootRef.current, () => onChange(!snapped))
-  return <div ref={rootRef} className={`snap-demo${snapped ? ' snapped' : ''}`}><div className="snap-main" data-flip-key="main"><h3>主视图</h3><p>宽屏时使用完整内容区域；Snap 后保留核心阅读与操作。</p></div><aside data-flip-key="aside"><button className="button" onClick={toggle}>{snapped ? '恢复完整视图' : '模拟 Snap View'}</button><p>{snapped ? '320px 级窄栏状态' : '拖到屏幕边缘时切换布局状态'}</p></aside></div>
+  return <div ref={rootRef} className={`snap-demo${snapped ? ' snapped' : ''}`}><div className="snap-main" data-flip-key="main"><h3>主视图</h3><p>宽屏时使用完整内容区域；Snap 后保留核心阅读与操作。</p></div><aside data-flip-key="aside"><Button onClick={toggle}>{snapped ? '恢复完整视图' : '模拟 Snap View'}</Button><p>{snapped ? '320px 级窄栏状态' : '拖到屏幕边缘时切换布局状态'}</p></aside></div>
 }
 
 export function Tile({ title, meta, glyph, wide, tone = 'blue', disabled = false }: { title: string; meta: string; glyph: string; wide?: boolean; tone?: 'blue' | 'green' | 'orange' | 'purple' | 'gray'; disabled?: boolean }) {
