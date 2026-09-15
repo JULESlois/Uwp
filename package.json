@@ -1,7 +1,7 @@
 {
   "name": "uwp-react-lab",
-  "private": true,
   "version": "0.1.0",
+  "description": "Typed React components and interaction patterns inspired by Windows 8 Modern UI and Windows 10 / early UWP.",
   "type": "module",
   "files": [
     "dist-lib"
@@ -17,6 +17,30 @@
     "./styles.css": "./dist-lib/styles.css",
     "./package.json": "./package.json"
   },
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JULESlois/Uwp.git"
+  },
+  "homepage": "https://github.com/JULESlois/Uwp#readme",
+  "bugs": {
+    "url": "https://github.com/JULESlois/Uwp/issues"
+  },
+  "keywords": [
+    "react",
+    "typescript",
+    "uwp",
+    "windows",
+    "modern-ui",
+    "metro",
+    "ui-components",
+    "design-system"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "vite",
     "dev:example": "vite --config vite.example.config.ts",
@@ -24,11 +48,13 @@
     "build": "tsc -b && vite build",
     "build:lib": "vite build --config vite.lib.config.ts && tsc -p tsconfig.lib.json",
     "build:example": "tsc -p tsconfig.example.json && vite build --config vite.example.config.ts",
+    "pack:check": "npm pack --dry-run --json",
+    "prepack": "npm run build:lib",
     "preview": "vite preview"
   },
-  "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+  "peerDependencies": {
+    "react": ">=18.3.1 <19",
+    "react-dom": ">=18.3.1 <19"
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.0",
@@ -36,6 +62,8 @@
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.3",
     "jsdom": "^26.1.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "typescript": "^5.6.3",
     "vite": "^5.4.10",
     "vitest": "^2.1.9"
