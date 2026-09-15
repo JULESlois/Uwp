@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { useState } from 'react'
-import { beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { ComboBox } from './combobox'
 
 beforeAll(() => {
@@ -9,6 +9,10 @@ beforeAll(() => {
     configurable: true,
     value: vi.fn(),
   })
+})
+
+afterEach(() => {
+  cleanup()
 })
 
 const options = [
