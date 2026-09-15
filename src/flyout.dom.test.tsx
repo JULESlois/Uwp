@@ -19,6 +19,8 @@ function FlyoutHarness() {
     open={open}
     onClose={() => setOpen(false)}
     anchor={<button onClick={() => setOpen(true)}>Open menu</button>}
+    ariaLabel="Project actions"
+    dismissLabel="Close project actions"
   >
     <button role="menuitem">Rename</button>
     <button role="menuitem">Delete</button>
@@ -26,7 +28,7 @@ function FlyoutHarness() {
 }
 
 describe('Flyout DOM focus behavior', () => {
-  it('moves focus to the first menu action when opened', async () => {
+  it('moves focus to the first menu action when opened and exposes a named menu', async () => {
     render(<FlyoutHarness />)
     const trigger = screen.getByRole('button', { name: 'Open menu' })
     trigger.focus()
@@ -34,7 +36,7 @@ describe('Flyout DOM focus behavior', () => {
     await flushFrame()
 
     expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Rename' }))
-    expect(screen.getByRole('menu').getAttribute('aria-hidden')).toBe('false')
+    expect(screen.getByRole('menu', { name: 'Project actions' }).getAttribute('aria-hidden')).toBe('false')
   })
 
   it('closes on Escape and restores focus to the opener', async () => {
@@ -44,7 +46,7 @@ describe('Flyout DOM focus behavior', () => {
     fireEvent.click(trigger)
     await flushFrame()
 
-    const menu = screen.getByRole('menu')
+    const menu = screen.getByRole('menu', { name: 'Project actions' })
     fireEvent.keyDown(menu, { key: 'Escape' })
     await flushFrame()
 
@@ -52,17 +54,17 @@ describe('Flyout DOM focus behavior', () => {
     expect(menu.getAttribute('aria-hidden')).toBe('true')
   })
 
-  it('dismisses from the scrim and restores focus', async () => {
+  it('uses the caller-provided dismiss label and restores focus', async () => {
     render(<FlyoutHarness />)
     const trigger = screen.getByRole('button', { name: 'Open menu' })
     trigger.focus()
     fireEvent.click(trigger)
     await flushFrame()
 
-    fireEvent.click(screen.getByRole('button', { name: '关闭弹出菜单' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Close project actions' }))
     await flushFrame()
 
     expect(document.activeElement).toBe(trigger)
-    expect(screen.getByRole('menu', { hidden: true }).getAttribute('aria-hidden')).toBe('true')
+    expect(screen.getByRole('menu', { name: 'Project actions', hidden: true }).getAttribute('aria-hidden')).toBe('true')
   })
 })
