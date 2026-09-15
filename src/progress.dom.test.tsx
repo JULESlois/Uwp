@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
+import type { CSSProperties } from 'react'
 import { ProgressBar } from './progress'
 
 afterEach(cleanup)
 
 describe('ProgressBar DOM semantics', () => {
   it('keeps the visual fill synchronized with the clamped accessible value', () => {
-    render(<ProgressBar value={140} max={120} label="Transfer" style={{ width: 240, '--progress-value': '1%' } as React.CSSProperties} />)
+    render(<ProgressBar value={140} max={120} label="Transfer" style={{ width: 240, '--progress-value': '1%' } as CSSProperties} />)
 
     const progress = screen.getByRole('progressbar', { name: 'Transfer' })
     expect(progress.getAttribute('aria-valuemin')).toBe('0')
