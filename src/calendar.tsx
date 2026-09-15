@@ -9,9 +9,11 @@ export type CalendarProps = {
   min?: Date
   max?: Date
   locale?: string
-  firstDayOfWeek?: 0 | 1
+  firstDayOfWeek?: 0 | 1 | 2 | 3 | 4 | 5 | 6
   disabled?: boolean
   label?: string
+  previousMonthLabel?: string
+  nextMonthLabel?: string
 }
 
 export function Calendar({
@@ -24,6 +26,8 @@ export function Calendar({
   firstDayOfWeek = 1,
   disabled = false,
   label = '选择日期',
+  previousMonthLabel = '上个月',
+  nextMonthLabel = '下个月',
 }: CalendarProps) {
   const today = useMemo(() => startOfDay(new Date()), [])
   const initial = clampDate(value ?? defaultValue ?? today, min, max)
@@ -117,9 +121,9 @@ export function Calendar({
     <header className="calendar__header">
       <h3 id={titleId}>{label}</h3>
       <div className="calendar__month-nav">
-        <button type="button" aria-label="上个月" disabled={disabled || previousMonthDisabled} onClick={() => navigateMonth(-1)}>‹</button>
+        <button type="button" aria-label={previousMonthLabel} disabled={disabled || previousMonthDisabled} onClick={() => navigateMonth(-1)}>‹</button>
         <strong aria-live="polite">{monthFormatter.format(viewMonth)}</strong>
-        <button type="button" aria-label="下个月" disabled={disabled || nextMonthDisabled} onClick={() => navigateMonth(1)}>›</button>
+        <button type="button" aria-label={nextMonthLabel} disabled={disabled || nextMonthDisabled} onClick={() => navigateMonth(1)}>›</button>
       </div>
     </header>
     <div ref={gridRef} className="calendar__grid" role="grid" aria-labelledby={titleId} aria-rowcount={7} aria-colcount={7}>
