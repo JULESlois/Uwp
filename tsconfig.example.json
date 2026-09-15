@@ -1,7 +1,11 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "noEmit": true
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "uwp-react-lab": ["./src/index.ts"]
+    }
   },
-  "include": ["examples/project-hub/**/*.ts", "examples/project-hub/**/*.tsx"]
+  "include": ["examples/project-hub/**/*.ts", "examples/project-hub/**/*.tsx", "src/**/*.ts", "src/**/*.tsx"]
 }
