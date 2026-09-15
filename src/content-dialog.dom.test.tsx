@@ -31,8 +31,8 @@ describe('ContentDialog DOM focus behavior', () => {
     fireEvent.click(trigger)
     await flushFrame()
 
-    expect(screen.getByRole('button', { name: 'Save' })).toHaveFocus()
-    expect(screen.getByRole('dialog', { name: 'Confirm action' })).toHaveAttribute('aria-modal', 'true')
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Save' }))
+    expect(screen.getByRole('dialog', { name: 'Confirm action' }).getAttribute('aria-modal')).toBe('true')
   })
 
   it('wraps Tab focus inside the dialog', async () => {
@@ -46,11 +46,11 @@ describe('ContentDialog DOM focus behavior', () => {
 
     cancel.focus()
     fireEvent.keyDown(dialog, { key: 'Tab' })
-    expect(save).toHaveFocus()
+    expect(document.activeElement).toBe(save)
 
     save.focus()
     fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: true })
-    expect(cancel).toHaveFocus()
+    expect(document.activeElement).toBe(cancel)
   })
 
   it('closes on Escape and restores focus to the opener', async () => {
@@ -67,8 +67,8 @@ describe('ContentDialog DOM focus behavior', () => {
     fireEvent.keyDown(dialog, { key: 'Escape' })
     await flushFrame()
 
-    expect(trigger).toHaveFocus()
-    expect(layer).toHaveAttribute('aria-hidden', 'true')
-    expect(dialog).not.toHaveAttribute('aria-modal')
+    expect(document.activeElement).toBe(trigger)
+    expect(layer?.getAttribute('aria-hidden')).toBe('true')
+    expect(dialog.hasAttribute('aria-modal')).toBe(false)
   })
 })
