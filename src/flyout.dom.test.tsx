@@ -61,10 +61,12 @@ describe('Flyout DOM focus behavior', () => {
     fireEvent.click(trigger)
     await flushFrame()
 
+    const menu = screen.getByRole('menu', { name: 'Project actions' })
     fireEvent.click(screen.getByRole('button', { name: 'Close project actions' }))
     await flushFrame()
 
     expect(document.activeElement).toBe(trigger)
-    expect(screen.getByRole('menu', { name: 'Project actions', hidden: true }).getAttribute('aria-hidden')).toBe('true')
+    expect(menu.getAttribute('aria-label')).toBe('Project actions')
+    expect(menu.getAttribute('aria-hidden')).toBe('true')
   })
 })
