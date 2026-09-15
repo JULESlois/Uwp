@@ -19,9 +19,11 @@
   },
   "scripts": {
     "dev": "vite",
+    "dev:example": "vite --config vite.example.config.ts",
     "test": "vitest run",
     "build": "tsc -b && vite build",
     "build:lib": "vite build --config vite.lib.config.ts && tsc -p tsconfig.lib.json",
+    "build:example": "tsc -p tsconfig.example.json && vite build --config vite.example.config.ts",
     "preview": "vite preview"
   },
   "dependencies": {
