@@ -60,10 +60,12 @@ describe('ContentDialog DOM focus behavior', () => {
     fireEvent.click(trigger)
     await flushFrame()
 
-    fireEvent.keyDown(screen.getByRole('dialog', { name: 'Confirm action' }), { key: 'Escape' })
+    const dialog = screen.getByRole('dialog', { name: 'Confirm action' })
+    fireEvent.keyDown(dialog, { key: 'Escape' })
     await flushFrame()
 
     expect(trigger).toHaveFocus()
-    expect(screen.queryByRole('dialog', { name: 'Confirm action' })).not.toBeInTheDocument()
+    expect(dialog).toHaveAttribute('aria-hidden', 'true')
+    expect(dialog).not.toHaveAttribute('aria-modal')
   })
 })
