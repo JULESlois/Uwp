@@ -10,11 +10,12 @@ function Probe() {
 describe('ThemeRoot', () => {
   it('provides defaults and stable theme attributes', () => {
     const { container } = render(<ThemeRoot><Probe /></ThemeRoot>)
-    const root = container.firstElementChild
+    const root = container.firstElementChild as HTMLElement
 
-    expect(root).toHaveClass('uwp-theme-root', 'win10')
-    expect(root).toHaveAttribute('data-uwp-era', 'win10')
-    expect(root).toHaveAttribute('data-uwp-color-scheme', 'light')
+    expect(root.classList.contains('uwp-theme-root')).toBe(true)
+    expect(root.classList.contains('win10')).toBe(true)
+    expect(root.getAttribute('data-uwp-era')).toBe('win10')
+    expect(root.getAttribute('data-uwp-color-scheme')).toBe('light')
     expect(screen.getByText('win10/light/standard/none')).toBeTruthy()
   })
 
@@ -26,8 +27,8 @@ describe('ThemeRoot', () => {
     )
     const root = container.firstElementChild as HTMLElement
 
-    expect(root).toHaveClass('uwp-theme-root', 'win8', 'dark', 'compact')
-    expect(root).toHaveAttribute('data-uwp-reduced-motion', 'true')
+    expect(['uwp-theme-root', 'win8', 'dark', 'compact'].every((name) => root.classList.contains(name))).toBe(true)
+    expect(root.getAttribute('data-uwp-reduced-motion')).toBe('true')
     expect(root.style.getPropertyValue('--accent')).toBe('#0078d4')
     expect(screen.getByText('win8/dark/compact/#0078d4')).toBeTruthy()
   })
