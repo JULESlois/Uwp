@@ -29,3 +29,5 @@ jobs:
         run: npm run build
       - name: Build library
         run: npm run build:lib
+      - name: Build public API example
+        run: npm run build:example
