@@ -69,6 +69,6 @@ describe('Calendar DOM keyboard behavior', () => {
 
     expect(document.activeElement).toBe(september16)
     expect(screen.getByRole('button', { name: 'September 17, 2026' }).hasAttribute('disabled')).toBe(true)
-    expect(screen.getByRole('button', { name: 'Next month' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('button', { name: '下个月' }).hasAttribute('disabled')).toBe(true)
   })
 })
