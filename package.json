@@ -3,10 +3,25 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "files": [
+    "dist-lib"
+  ],
+  "main": "./dist-lib/index.js",
+  "module": "./dist-lib/index.js",
+  "types": "./dist-lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist-lib/index.d.ts",
+      "import": "./dist-lib/index.js"
+    },
+    "./styles.css": "./dist-lib/styles.css",
+    "./package.json": "./package.json"
+  },
   "scripts": {
     "dev": "vite",
     "test": "vitest run",
     "build": "tsc -b && vite build",
+    "build:lib": "vite build --config vite.lib.config.ts && tsc -p tsconfig.lib.json",
     "preview": "vite preview"
   },
   "dependencies": {
