@@ -41,7 +41,7 @@ export function ProgressBar({ value = 0, max = 100, indeterminate = false, label
   const safeMax = Number.isFinite(max) && max > 0 ? max : 100
   const safeValue = Number.isFinite(value) ? Math.min(Math.max(value, 0), safeMax) : 0
   const percent = (safeValue / safeMax) * 100
-  const style = { '--progress-value': `${percent}%` } as CSSProperties
+  const progressStyle = { '--progress-value': `${percent}%` } as CSSProperties
 
   return (
     <div
@@ -53,7 +53,7 @@ export function ProgressBar({ value = 0, max = 100, indeterminate = false, label
       aria-valuemax={indeterminate ? undefined : safeMax}
       aria-valuenow={indeterminate ? undefined : safeValue}
       aria-busy={indeterminate || undefined}
-      style={{ ...style, ...props.style }}
+      style={{ ...props.style, ...progressStyle }}
     >
       <span className="progress-bar__track" aria-hidden="true">
         <i className="progress-bar__indicator" />
