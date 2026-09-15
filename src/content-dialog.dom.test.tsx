@@ -61,11 +61,14 @@ describe('ContentDialog DOM focus behavior', () => {
     await flushFrame()
 
     const dialog = screen.getByRole('dialog', { name: 'Confirm action' })
+    const layer = dialog.closest('.dialog-layer')
+    expect(layer).not.toBeNull()
+
     fireEvent.keyDown(dialog, { key: 'Escape' })
     await flushFrame()
 
     expect(trigger).toHaveFocus()
-    expect(dialog).toHaveAttribute('aria-hidden', 'true')
+    expect(layer).toHaveAttribute('aria-hidden', 'true')
     expect(dialog).not.toHaveAttribute('aria-modal')
   })
 })
