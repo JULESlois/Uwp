@@ -4,6 +4,12 @@ import { modalTabTarget } from './modal-focus'
 
 const focusableSelector = 'button:not(:disabled),input:not([type="hidden"]):not(:disabled),select:not(:disabled),textarea:not(:disabled),a[href],[contenteditable="true"],[tabindex]:not([tabindex="-1"])'
 
+function focusSurfaceFallback(surface: HTMLElement | null) {
+  if (!surface) return
+  if (!surface.hasAttribute('tabindex')) surface.tabIndex = -1
+  surface.focus()
+}
+
 export function useFocusReturn(open: boolean, surface: RefObject<HTMLElement | null>, initialSelector = 'button:not(:disabled)') {
   const returnFocus = useRef<HTMLElement | null>(null)
   const wasOpen = useRef(false)
@@ -15,7 +21,9 @@ export function useFocusReturn(open: boolean, surface: RefObject<HTMLElement | n
       returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
       requestAnimationFrame(() => {
         if (focusVersion.current !== version) return
-        surface.current?.querySelector<HTMLElement>(initialSelector)?.focus()
+        const initialTarget = surface.current?.querySelector<HTMLElement>(initialSelector)
+        if (initialTarget) initialTarget.focus()
+        else focusSurfaceFallback(surface.current)
       })
     } else if (!open && wasOpen.current) {
       requestAnimationFrame(() => {
@@ -39,7 +47,11 @@ export function trapModalFocus(
   if (event.key !== 'Tab') return
 
   const focusable = enabledElements(surface, focusableSelector)
-  if (!focusable.length) return
+  if (!focusable.length) {
+    event.preventDefault()
+    focusSurfaceFallback(surface)
+    return
+  }
 
   const activeIndex = focusable.findIndex((element) => element === document.activeElement)
   const target = modalTabTarget(focusable.length, activeIndex, event.shiftKey)
