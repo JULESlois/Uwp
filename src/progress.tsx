@@ -20,14 +20,14 @@ function classNames(...values: Array<string | false | undefined>) {
   return values.filter(Boolean).join(' ')
 }
 
-export function ProgressRing({ active = true, size = 'medium', label = '正在处理', className, ...props }: ProgressRingProps) {
+export function ProgressRing({ active = true, size = 'medium', label, className, 'aria-label': ariaLabel, ...props }: ProgressRingProps) {
   return (
     <div
       {...props}
       className={classNames('progress-ring', `progress-ring--${size}`, !active && 'progress-ring--paused', className)}
       role="status"
       aria-live="polite"
-      aria-label={label}
+      aria-label={ariaLabel ?? label ?? '正在处理'}
       aria-busy={active || undefined}
     >
       <span className="progress-ring__visual" aria-hidden="true">
@@ -37,7 +37,7 @@ export function ProgressRing({ active = true, size = 'medium', label = '正在�
   )
 }
 
-export function ProgressBar({ value = 0, max = 100, indeterminate = false, label = '进度', className, ...props }: ProgressBarProps) {
+export function ProgressBar({ value = 0, max = 100, indeterminate = false, label, className, 'aria-label': ariaLabel, ...props }: ProgressBarProps) {
   const safeMax = Number.isFinite(max) && max > 0 ? max : 100
   const safeValue = Number.isFinite(value) ? Math.min(Math.max(value, 0), safeMax) : 0
   const percent = (safeValue / safeMax) * 100
@@ -48,7 +48,7 @@ export function ProgressBar({ value = 0, max = 100, indeterminate = false, label
       {...props}
       className={classNames('progress-bar', indeterminate && 'progress-bar--indeterminate', className)}
       role="progressbar"
-      aria-label={label}
+      aria-label={ariaLabel ?? label ?? '进度'}
       aria-valuemin={indeterminate ? undefined : 0}
       aria-valuemax={indeterminate ? undefined : safeMax}
       aria-valuenow={indeterminate ? undefined : safeValue}
