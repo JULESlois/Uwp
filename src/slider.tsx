@@ -1,4 +1,4 @@
-import { useId, useState, type CSSProperties, type ChangeEvent, type InputHTMLAttributes, type ReactNode } from 'react'
+import { forwardRef, useId, useState, type CSSProperties, type ChangeEvent, type InputHTMLAttributes, type ReactNode } from 'react'
 import './slider.css'
 
 export interface SliderProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'value' | 'defaultValue'> {
@@ -10,7 +10,7 @@ export interface SliderProps extends Omit<InputHTMLAttributes<HTMLInputElement>,
   onValueChange?: (value: number) => void
 }
 
-export function Slider({
+export const Slider = forwardRef<HTMLInputElement, SliderProps>(function Slider({
   label,
   id,
   min = 0,
@@ -28,7 +28,7 @@ export function Slider({
   'aria-label': ariaLabel,
   'aria-labelledby': ariaLabelledBy,
   ...props
-}: SliderProps) {
+}, ref) {
   const generatedId = useId()
   const inputId = id ?? generatedId
   const labelId = `${inputId}-label`
@@ -56,6 +56,7 @@ export function Slider({
     </span>
     <input
       {...props}
+      ref={ref}
       id={inputId}
       className={className}
       type="range"
@@ -71,4 +72,4 @@ export function Slider({
       onChange={handleChange}
     />
   </label>
-}
+})
