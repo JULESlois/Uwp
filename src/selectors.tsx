@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useRef, type InputHTMLAttributes, type ReactNode } from 'react'
+import { forwardRef, useEffect, useId, useRef, type FieldsetHTMLAttributes, type InputHTMLAttributes, type ReactNode } from 'react'
 import './selectors.css'
 
 type SelectorInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'checked' | 'defaultChecked' | 'onChange' | 'children'>
@@ -69,6 +69,49 @@ export const RadioButton = forwardRef<HTMLInputElement, RadioButtonProps>(functi
     {label != null && <span className="selector-label">{label}</span>}
   </label>
 })
+
+export type RadioGroupOption<T extends string> = {
+  value: T
+  label: ReactNode
+  disabled?: boolean
+}
+
+export interface RadioGroupProps<T extends string> extends Omit<FieldsetHTMLAttributes<HTMLFieldSetElement>, 'onChange'> {
+  value: T
+  onChange: (value: T) => void
+  options: readonly RadioGroupOption<T>[]
+  legend?: ReactNode
+  name?: string
+  orientation?: 'horizontal' | 'vertical'
+}
+
+export function RadioGroup<T extends string>({
+  value,
+  onChange,
+  options,
+  legend,
+  name,
+  orientation = 'vertical',
+  disabled = false,
+  className = '',
+  ...fieldsetProps
+}: RadioGroupProps<T>) {
+  const generatedName = useId()
+  const groupName = name ?? generatedName
+
+  return <fieldset {...fieldsetProps} disabled={disabled} className={`radio-group ${orientation}${className ? ` ${className}` : ''}`}>
+    {legend != null && <legend>{legend}</legend>}
+    {options.map((option) => <RadioButton
+      key={option.value}
+      name={groupName}
+      value={option.value}
+      checked={option.value === value}
+      disabled={option.disabled}
+      onChange={(checked) => { if (checked) onChange(option.value) }}
+      label={option.label}
+    />)}
+  </fieldset>
+}
 
 export interface ToggleSwitchProps extends SelectorInputProps {
   checked: boolean
