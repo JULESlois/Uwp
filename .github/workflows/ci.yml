@@ -33,3 +33,23 @@ jobs:
         run: npm run pack:check
       - name: Build public API example
         run: npm run build:example
+
+  react-19:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install React 19 compatibility baseline
+        run: npm install --no-save react@^19 react-dom@^19 @types/react@^19 @types/react-dom@^19
+      - name: Test with React 19
+        run: npm test
+      - name: Build library with React 19
+        run: npm run build:lib
+      - name: Build public API example with React 19
+        run: npm run build:example
+      - name: Verify npm package with React 19
+        run: npm run pack:check
