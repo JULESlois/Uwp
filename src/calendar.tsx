@@ -1,8 +1,8 @@
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { forwardRef, useEffect, useId, useMemo, useRef, useState, type HTMLAttributes, type KeyboardEvent } from 'react'
 import './calendar.css'
 import { addDays, addMonths, clampDate, daysInMonth, moveMonthPreservingDay, sameDay, sameMonth, startOfDay } from './calendar-utils'
 
-export type CalendarProps = {
+export type CalendarProps = Omit<HTMLAttributes<HTMLElement>, 'defaultValue'> & {
   value?: Date
   defaultValue?: Date
   onValueChange?: (value: Date) => void
@@ -16,7 +16,7 @@ export type CalendarProps = {
   nextMonthLabel?: string
 }
 
-export function Calendar({
+export const Calendar = forwardRef<HTMLElement, CalendarProps>(function Calendar({
   value,
   defaultValue,
   onValueChange,
@@ -28,7 +28,10 @@ export function Calendar({
   label = '选择日期',
   previousMonthLabel = '上个月',
   nextMonthLabel = '下个月',
-}: CalendarProps) {
+  className,
+  'aria-labelledby': ariaLabelledBy,
+  ...sectionProps
+}, ref) {
   const today = useMemo(() => startOfDay(new Date()), [])
   const initial = clampDate(value ?? defaultValue ?? today, min, max)
   const [internalValue, setInternalValue] = useState(initial)
@@ -117,7 +120,13 @@ export function Calendar({
     setFocusedDate(nextFocus)
   }
 
-  return <section className={`calendar${disabled ? ' calendar--disabled' : ''}`} aria-labelledby={titleId} aria-disabled={disabled || undefined}>
+  return <section
+    {...sectionProps}
+    ref={ref}
+    className={`calendar${disabled ? ' calendar--disabled' : ''}${className ? ` ${className}` : ''}`}
+    aria-labelledby={ariaLabelledBy ?? titleId}
+    aria-disabled={disabled || undefined}
+  >
     <header className="calendar__header">
       <h3 id={titleId}>{label}</h3>
       <div className="calendar__month-nav">
@@ -126,7 +135,7 @@ export function Calendar({
         <button type="button" aria-label={nextMonthLabel} disabled={disabled || nextMonthDisabled} onClick={() => navigateMonth(1)}>›</button>
       </div>
     </header>
-    <div ref={gridRef} className="calendar__grid" role="grid" aria-labelledby={titleId} aria-rowcount={7} aria-colcount={7}>
+    <div ref={gridRef} className="calendar__grid" role="grid" aria-labelledby={ariaLabelledBy ?? titleId} aria-rowcount={7} aria-colcount={7}>
       <div className="calendar__weekdays" role="row">{weekdays.map((day, index) => <span key={`${day}-${index}`} role="columnheader">{day}</span>)}</div>
       {weeks.map((week, rowIndex) => <div className="calendar__row" role="row" key={`${viewMonth.getFullYear()}-${viewMonth.getMonth()}-${rowIndex}`}>
         {week.map((date) => {
@@ -156,4 +165,4 @@ export function Calendar({
       </div>)}
     </div>
   </section>
-}
+})
