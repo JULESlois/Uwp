@@ -1,4 +1,4 @@
-import type { CSSProperties, HTMLAttributes } from 'react'
+import { forwardRef, type CSSProperties, type HTMLAttributes } from 'react'
 import './progress.css'
 
 export type ProgressSize = 'small' | 'medium' | 'large'
@@ -20,10 +20,14 @@ function classNames(...values: Array<string | false | undefined>) {
   return values.filter(Boolean).join(' ')
 }
 
-export function ProgressRing({ active = true, size = 'medium', label, className, 'aria-label': ariaLabel, ...props }: ProgressRingProps) {
+export const ProgressRing = forwardRef<HTMLDivElement, ProgressRingProps>(function ProgressRing(
+  { active = true, size = 'medium', label, className, 'aria-label': ariaLabel, ...props },
+  ref,
+) {
   return (
     <div
       {...props}
+      ref={ref}
       className={classNames('progress-ring', `progress-ring--${size}`, !active && 'progress-ring--paused', className)}
       role="status"
       aria-live="polite"
@@ -35,9 +39,12 @@ export function ProgressRing({ active = true, size = 'medium', label, className,
       </span>
     </div>
   )
-}
+})
 
-export function ProgressBar({ value = 0, max = 100, indeterminate = false, label, className, 'aria-label': ariaLabel, ...props }: ProgressBarProps) {
+export const ProgressBar = forwardRef<HTMLDivElement, ProgressBarProps>(function ProgressBar(
+  { value = 0, max = 100, indeterminate = false, label, className, 'aria-label': ariaLabel, ...props },
+  ref,
+) {
   const safeMax = Number.isFinite(max) && max > 0 ? max : 100
   const safeValue = Number.isFinite(value) ? Math.min(Math.max(value, 0), safeMax) : 0
   const percent = (safeValue / safeMax) * 100
@@ -46,6 +53,7 @@ export function ProgressBar({ value = 0, max = 100, indeterminate = false, label
   return (
     <div
       {...props}
+      ref={ref}
       className={classNames('progress-bar', indeterminate && 'progress-bar--indeterminate', className)}
       role="progressbar"
       aria-label={ariaLabel ?? label ?? '进度'}
@@ -60,4 +68,4 @@ export function ProgressBar({ value = 0, max = 100, indeterminate = false, label
       </span>
     </div>
   )
-}
+})
