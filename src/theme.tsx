@@ -26,7 +26,8 @@ export type ThemeRootProps = Omit<HTMLAttributes<HTMLDivElement>, 'color'> & {
 }
 
 export function ThemeRoot({ children, theme, className = '', style, ...props }: ThemeRootProps) {
-  const value = { ...defaultUwpTheme, ...theme }
+  const parentTheme = useContext(UwpThemeContext)
+  const value = { ...parentTheme, ...theme }
   const classes = [
     'uwp-theme-root',
     value.era,
