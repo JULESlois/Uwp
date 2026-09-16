@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { CheckBox, RadioButton, ToggleSwitch } from './selectors'
+import { CheckBox, RadioButton, RadioGroup, ToggleSwitch } from './selectors'
 
 describe('selector primitives', () => {
   it('exposes mixed checkbox state accessibly', () => {
@@ -13,6 +13,25 @@ describe('selector primitives', () => {
     expect(markup).toContain('type="radio"')
     expect(markup).toContain('name="density"')
     expect(markup).toContain('value="compact"')
+  })
+
+  it('renders a semantic typed radio group with a shared name', () => {
+    const markup = renderToStaticMarkup(<RadioGroup
+      value="standard"
+      onChange={() => undefined}
+      name="density"
+      legend="Density"
+      orientation="horizontal"
+      options={[
+        { value: 'standard', label: 'Standard' },
+        { value: 'compact', label: 'Compact', disabled: true },
+      ] as const}
+    />)
+    expect(markup).toContain('<fieldset class="radio-group horizontal">')
+    expect(markup).toContain('<legend>Density</legend>')
+    expect(markup.match(/name="density"/g)).toHaveLength(2)
+    expect(markup).toContain('value="standard" checked=""')
+    expect(markup).toContain('value="compact" disabled=""')
   })
 
   it('uses switch semantics for toggles', () => {
