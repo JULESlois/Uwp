@@ -30,8 +30,8 @@ describe('selector primitives', () => {
     expect(markup).toContain('<fieldset class="radio-group horizontal">')
     expect(markup).toContain('<legend>Density</legend>')
     expect(markup.match(/name="density"/g)).toHaveLength(2)
-    expect(markup).toContain('value="standard" checked=""')
-    expect(markup).toContain('value="compact" disabled=""')
+    expect(markup).toMatch(/value="standard"[^>]*checked=""|checked=""[^>]*value="standard"/)
+    expect(markup).toMatch(/value="compact"[^>]*disabled=""|disabled=""[^>]*value="compact"/)
   })
 
   it('uses switch semantics for toggles', () => {
