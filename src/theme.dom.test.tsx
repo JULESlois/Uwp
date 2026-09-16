@@ -34,4 +34,21 @@ describe('ThemeRoot', () => {
     expect(root.style.getPropertyValue('--accent')).toBe('#0078d4')
     expect(screen.getByText('win8/dark/compact/#0078d4')).toBeTruthy()
   })
+
+  it('inherits unspecified values through nested theme roots', () => {
+    const { container } = render(
+      <ThemeRoot theme={{ era: 'win8', colorScheme: 'dark', accentColor: '#0067c0' }}>
+        <ThemeRoot theme={{ density: 'compact' }}>
+          <Probe />
+        </ThemeRoot>
+      </ThemeRoot>,
+    )
+    const nestedRoot = container.querySelectorAll<HTMLElement>('.uwp-theme-root')[1]
+
+    expect(nestedRoot?.getAttribute('data-uwp-era')).toBe('win8')
+    expect(nestedRoot?.getAttribute('data-uwp-color-scheme')).toBe('dark')
+    expect(nestedRoot?.getAttribute('data-uwp-density')).toBe('compact')
+    expect(nestedRoot?.style.getPropertyValue('--accent')).toBe('#0067c0')
+    expect(screen.getByText('win8/dark/compact/#0067c0')).toBeTruthy()
+  })
 })
