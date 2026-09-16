@@ -83,6 +83,8 @@ export interface RadioGroupProps<T extends string> extends Omit<FieldsetHTMLAttr
   legend?: ReactNode
   name?: string
   orientation?: 'horizontal' | 'vertical'
+  /** Applies native HTML constraint validation to every radio in the group. */
+  required?: boolean
 }
 
 export function RadioGroup<T extends string>({
@@ -93,6 +95,7 @@ export function RadioGroup<T extends string>({
   name,
   orientation = 'vertical',
   disabled = false,
+  required = false,
   className = '',
   ...fieldsetProps
 }: RadioGroupProps<T>) {
@@ -107,6 +110,7 @@ export function RadioGroup<T extends string>({
       value={option.value}
       checked={option.value === value}
       disabled={option.disabled}
+      required={required}
       onChange={(checked) => { if (checked) onChange(option.value) }}
       label={option.label}
     />)}
