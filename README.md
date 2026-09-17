@@ -86,13 +86,24 @@ npm run build:example
 - `pack:check` dry-runs npm packaging from that staged directory rather than from the repository root.
 - `build:example` verifies a consumer-style application against the package entry points.
 
-The repository root is marked `private` to prevent accidental direct publishing. For a registry release, use:
+## npm release flow
+
+The repository root stays `private` and cannot be published directly. Releases use npm Trusted Publishing with staged publishing instead of a long-lived write token or direct automated publication.
+
+For each release:
+
+1. Update `package.json` to the intended version.
+2. Create a GitHub Release whose tag is exactly `v<version>` (for example `v0.1.1`).
+3. `.github/workflows/publish-npm.yml` verifies the tag, runs tests and consumer/package checks, then stages `npm-package/` on npm through OIDC.
+4. Review the staged package on npm and approve it with 2FA before it becomes public.
+
+The release workflow never runs `npm publish`. A local authenticated staging run is also available:
 
 ```bash
-npm run publish:npm
+npm run stage:npm
 ```
 
-This publishes `npm-package/`, not the Git repository working tree.
+Before the first automated release, configure the `uwp_components` npm package Trusted Publisher for GitHub Actions with repository `JULESlois/Uwp`, workflow filename `publish-npm.yml`, and stage-publish permission. No `NPM_TOKEN` secret is required by the workflow.
 
 CI validates the default React baseline and a separate React 19 consumer baseline for automation branches and pull requests.
 
