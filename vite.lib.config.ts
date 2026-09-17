@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-const entry = fileURLToPath(new URL('./src/index.ts', import.meta.url))
+const entry = (path: string) => fileURLToPath(new URL(path, import.meta.url))
 
 export default defineConfig({
   plugins: [react()],
@@ -10,10 +10,16 @@ export default defineConfig({
     outDir: 'dist-lib',
     emptyOutDir: true,
     lib: {
-      entry,
-      name: 'UwpReact',
+      entry: {
+        index: entry('./src/index.ts'),
+        controls: entry('./src/entrypoints/controls.ts'),
+        commands: entry('./src/entrypoints/commands.ts'),
+        navigation: entry('./src/entrypoints/navigation.ts'),
+        collections: entry('./src/entrypoints/collections.ts'),
+        overlays: entry('./src/entrypoints/overlays.ts'),
+      },
       formats: ['es'],
-      fileName: 'index',
+      fileName: (_format, entryName) => `${entryName}.js`,
       cssFileName: 'styles',
     },
     rollupOptions: {
