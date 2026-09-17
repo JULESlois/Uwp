@@ -4,7 +4,12 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "uwp-react-lab": ["./src/index.ts"]
+      "uwp-react-lab": ["./src/index.ts"],
+      "uwp-react-lab/controls": ["./src/entrypoints/controls.ts"],
+      "uwp-react-lab/commands": ["./src/entrypoints/commands.ts"],
+      "uwp-react-lab/navigation": ["./src/entrypoints/navigation.ts"],
+      "uwp-react-lab/collections": ["./src/entrypoints/collections.ts"],
+      "uwp-react-lab/overlays": ["./src/entrypoints/overlays.ts"]
     }
   },
   "include": ["examples/project-hub/**/*.ts", "examples/project-hub/**/*.tsx", "src/**/*.ts", "src/**/*.tsx"]
