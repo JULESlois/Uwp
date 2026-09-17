@@ -23,6 +23,10 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install
+      - name: Verify release metadata contract
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          RELEASE_TAG="v$VERSION" npm run release:check
       - name: Test
         run: npm test
       - name: Build showcase
