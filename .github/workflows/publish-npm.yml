@@ -1,0 +1,43 @@
+name: Stage npm release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
+      NPM_DIST_TAG: ${{ github.event.release.prerelease && 'next' || 'latest' }}
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+      - name: Install staged-publishing npm CLI
+        run: npm install --global npm@^11.15.0
+      - name: Install dependencies
+        run: npm install
+      - name: Verify release metadata
+        run: npm run release:check
+      - name: Test
+        run: npm test
+      - name: Build public API example
+        run: npm run build:example
+      - name: Prepare and verify npm package
+        run: npm run package:stage
+      - name: Verify package tarball
+        run: npm pack ./npm-package --dry-run --json
+      - name: Stage package on npm
+        run: npm stage publish ./npm-package --access public --tag "$NPM_DIST_TAG"
