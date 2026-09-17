@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject, type ReactNode } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type RefObject, type ReactNode } from 'react'
 import { CommandIcon } from './command-icons'
 import { menuKeyDown } from './focus-utils'
 import { useLayerPresence } from './internal-motion'
@@ -79,11 +79,21 @@ export function Flyout({ open, onClose, anchor, children, ariaLabel, dismissLabe
   </>}</span>
 }
 
-export function TeachingTip({ open, title, children, anchor, onClose }: { open: boolean; title: string; children: ReactNode; anchor: ReactNode; onClose: () => void }) {
+export interface TeachingTipProps {
+  open: boolean
+  title: string
+  children: ReactNode
+  anchor: ReactNode
+  onClose: () => void
+  closeLabel?: string
+}
+
+export function TeachingTip({ open, title, children, anchor, onClose, closeLabel = '关闭提示' }: TeachingTipProps) {
   const host = useRef<HTMLSpanElement>(null)
   const surface = useRef<HTMLDivElement>(null)
+  const titleId = useId()
   const presence = useLayerPresence(open)
   const placement = useAnchoredPlacement(host, surface, presence.mounted)
 
-  return <span ref={host} className="teaching-anchor">{anchor}{presence.mounted && <div ref={surface} className={`teaching-tip internal-popover placement-${placement}${presence.entered ? ' entered' : ''}`} role="status" aria-hidden={!open} onTransitionEnd={(event) => { if (event.target !== surface.current || event.propertyName !== 'transform' || open) return; presence.finishExit() }}><button className="teaching-close" tabIndex={open ? 0 : -1} aria-label="关闭提示" onClick={onClose}><span className="teaching-close-icon" aria-hidden="true"><CommandIcon name="close" /></span></button><strong>{title}</strong><div>{children}</div></div>}</span>
+  return <span ref={host} className="teaching-anchor">{anchor}{presence.mounted && <div ref={surface} className={`teaching-tip internal-popover placement-${placement}${presence.entered ? ' entered' : ''}`} role="dialog" aria-modal="false" aria-labelledby={titleId} aria-hidden={!open} onTransitionEnd={(event) => { if (event.target !== surface.current || event.propertyName !== 'transform' || open) return; presence.finishExit() }}><button className="teaching-close" tabIndex={open ? 0 : -1} aria-label={closeLabel} onClick={onClose}><span className="teaching-close-icon" aria-hidden="true"><CommandIcon name="close" /></span></button><strong id={titleId}>{title}</strong><div>{children}</div></div>}</span>
 }
