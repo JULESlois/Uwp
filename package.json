@@ -1,7 +1,7 @@
 {
   "name": "uwp_components",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Typed React components and interaction patterns inspired by Windows 8 Modern UI and Windows 10 / early UWP.",
   "type": "module",
   "files": [
@@ -71,7 +71,8 @@
     "build:example": "tsc -p tsconfig.example.json && vite build --config vite.example.config.ts",
     "package:stage": "npm run build:lib && node scripts/prepare-npm-package.mjs && node scripts/verify-npm-package.mjs",
     "pack:check": "npm run package:stage && npm pack ./npm-package --dry-run --json",
-    "publish:npm": "npm run package:stage && npm publish ./npm-package",
+    "release:check": "node scripts/verify-release.mjs",
+    "stage:npm": "npm run package:stage && npm stage publish ./npm-package --access public",
     "preview": "vite preview"
   },
   "peerDependencies": {
