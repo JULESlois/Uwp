@@ -7,29 +7,31 @@ The project has two roles that are intentionally kept separate:
 - **Library** — reusable typed components, interaction primitives, design tokens and styles exported through stable package entry points.
 - **Showcase / examples** — applications that consume the same public API instead of maintaining a parallel set of controls.
 
+The GitHub repository documents development, architecture, Showcase work, examples, and implementation research. The published npm package uses a separate usage-first README from `npm/README.md` and does not publish Showcase or example sources.
+
 ## Package usage
 
-The repository is structured for npm distribution. After the first registry release, consumers will install the package together with its React peer dependencies:
+The public npm package is `uwp_components`:
 
 ```bash
-npm install uwp-react-lab react react-dom
+npm install uwp_components react react-dom
 ```
 
 Load the shared styles once at application startup. The package root remains a convenience entry point:
 
 ```tsx
-import { Button, ComboBox, CommandBar, ContentDialog } from 'uwp-react-lab'
-import 'uwp-react-lab/styles.css'
+import { Button, ComboBox, CommandBar, ContentDialog } from 'uwp_components'
+import 'uwp_components/styles.css'
 ```
 
 For larger applications, prefer the domain entry points so dependencies reflect the application architecture:
 
 ```tsx
-import { Button, ComboBox, Slider } from 'uwp-react-lab/controls'
-import { CommandBar } from 'uwp-react-lab/commands'
-import { AdaptiveNavigationView } from 'uwp-react-lab/navigation'
-import { CollectionView } from 'uwp-react-lab/collections'
-import { ContentDialog, Flyout } from 'uwp-react-lab/overlays'
+import { Button, ComboBox, Slider } from 'uwp_components/controls'
+import { CommandBar } from 'uwp_components/commands'
+import { AdaptiveNavigationView } from 'uwp_components/navigation'
+import { CollectionView } from 'uwp_components/collections'
+import { ContentDialog, Flyout } from 'uwp_components/overlays'
 ```
 
 React and React DOM are peer dependencies so applications keep ownership of their React runtime.
@@ -49,11 +51,12 @@ The package currently exposes controls and patterns including:
 
 `src/index.ts` is the compatibility root. Domain entry points under `src/entrypoints` define narrower package boundaries for controls, commands, navigation, collections and overlays. New applications and examples should not import implementation modules directly.
 
-## Example application
+## Showcase and example application
 
-`examples/project-hub` is a small application built through package-style imports. It intentionally consumes the domain entry points so missing exports or broken subpath mappings fail the example build.
+The repository contains the main component Showcase plus `examples/project-hub`, a small application built through package-style imports. These are development and demonstration surfaces; they are intentionally excluded from the staged npm package.
 
 ```bash
+npm run dev
 npm run dev:example
 npm run build:example
 ```
@@ -65,7 +68,7 @@ npm install
 npm run dev
 ```
 
-The main showcase is deployed as a GitHub project page, so its Vite build uses `/Uwp/` as the base path.
+The main Showcase is deployed as a GitHub project page, so its Vite build uses `/Uwp/` as the base path.
 
 ## Validation
 
@@ -77,10 +80,19 @@ npm run pack:check
 npm run build:example
 ```
 
-- `build` validates the showcase.
+- `build` validates the Showcase.
 - `build:lib` emits the npm-facing ESM bundles, CSS and TypeScript declarations into `dist-lib`.
-- `pack:check` runs the npm packaging lifecycle and reports the files that would be published.
+- `package:stage` builds the library and creates a clean `npm-package/` directory containing only publishable runtime files, package metadata, and the npm-specific README.
+- `pack:check` dry-runs npm packaging from that staged directory rather than from the repository root.
 - `build:example` verifies a consumer-style application against the package entry points.
+
+The repository root is marked `private` to prevent accidental direct publishing. For a registry release, use:
+
+```bash
+npm run publish:npm
+```
+
+This publishes `npm-package/`, not the Git repository working tree.
 
 CI validates the default React baseline and a separate React 19 consumer baseline for automation branches and pull requests.
 
@@ -88,7 +100,7 @@ CI validates the default React baseline and a separate React 19 consumer baselin
 
 The library is being decomposed toward domain-owned modules with stable package entry points. The public subpaths are intentionally introduced before large implementation moves so internal files can be split without forcing consumers to change imports. The next structural work is to move shared models such as collection item types into their owning domain and eliminate reverse dependencies between large implementation modules.
 
-The showcase will likewise be split into independent pages and converted to consume only package boundaries. This prevents demo-only imports from becoming accidental public APIs and makes components easier to test, publish and reuse.
+The Showcase will likewise be split into independent pages and converted to consume only package boundaries. This prevents demo-only imports from becoming accidental public APIs and makes components easier to test, publish and reuse.
 
 ## Scope
 
