@@ -1,7 +1,16 @@
-import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const source = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
+const modules = import.meta.glob('./{entrypoints/collections.ts,collection-model.ts}', {
+  eager: true,
+  query: '?raw',
+  import: 'default',
+}) as Record<string, string>
+
+const source = (path: string) => {
+  const content = modules[path]
+  if (content === undefined) throw new Error(`Missing architecture fixture: ${path}`)
+  return content
+}
 
 describe('package architecture boundaries', () => {
   it('keeps the collections public entrypoint independent from the components barrel', () => {
