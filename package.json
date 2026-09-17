@@ -69,7 +69,7 @@
     "build": "tsc -b && vite build",
     "build:lib": "vite build --config vite.lib.config.ts && tsc -p tsconfig.lib.json",
     "build:example": "tsc -p tsconfig.example.json && vite build --config vite.example.config.ts",
-    "package:stage": "npm run build:lib && node scripts/prepare-npm-package.mjs",
+    "package:stage": "npm run build:lib && node scripts/prepare-npm-package.mjs && node scripts/verify-npm-package.mjs",
     "pack:check": "npm run package:stage && npm pack ./npm-package --dry-run --json",
     "publish:npm": "npm run package:stage && npm publish ./npm-package",
     "preview": "vite preview"
