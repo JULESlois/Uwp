@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Button, CheckBox, ComboBox, Pivot, ProgressBar, Slider } from 'uwp-react-lab/controls'
-import { CommandBar } from 'uwp-react-lab/commands'
-import { ContentDialog } from 'uwp-react-lab/overlays'
+import { Button, CheckBox, ComboBox, Pivot, ProgressBar, Slider } from 'uwp_components/controls'
+import { CommandBar } from 'uwp_components/commands'
+import { ContentDialog } from 'uwp_components/overlays'
 
 type View = 'projects' | 'activity'
 
