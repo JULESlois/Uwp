@@ -1,2 +1,2 @@
 export * from '../collections'
-export type { ListItem } from '../components'
+export type { ListItem } from '../collection-model'
