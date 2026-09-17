@@ -14,6 +14,26 @@
       "types": "./dist-lib/index.d.ts",
       "import": "./dist-lib/index.js"
     },
+    "./controls": {
+      "types": "./dist-lib/entrypoints/controls.d.ts",
+      "import": "./dist-lib/controls.js"
+    },
+    "./commands": {
+      "types": "./dist-lib/entrypoints/commands.d.ts",
+      "import": "./dist-lib/commands.js"
+    },
+    "./navigation": {
+      "types": "./dist-lib/entrypoints/navigation.d.ts",
+      "import": "./dist-lib/navigation.js"
+    },
+    "./collections": {
+      "types": "./dist-lib/entrypoints/collections.d.ts",
+      "import": "./dist-lib/collections.js"
+    },
+    "./overlays": {
+      "types": "./dist-lib/entrypoints/overlays.d.ts",
+      "import": "./dist-lib/overlays.js"
+    },
     "./styles.css": "./dist-lib/styles.css",
     "./package.json": "./package.json"
   },
