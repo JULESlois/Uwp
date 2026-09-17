@@ -1,5 +1,6 @@
 {
-  "name": "uwp-react-lab",
+  "name": "uwp_components",
+  "private": true,
   "version": "0.1.0",
   "description": "Typed React components and interaction patterns inspired by Windows 8 Modern UI and Windows 10 / early UWP.",
   "type": "module",
@@ -68,8 +69,9 @@
     "build": "tsc -b && vite build",
     "build:lib": "vite build --config vite.lib.config.ts && tsc -p tsconfig.lib.json",
     "build:example": "tsc -p tsconfig.example.json && vite build --config vite.example.config.ts",
-    "pack:check": "npm pack --dry-run --json",
-    "prepack": "npm run build:lib",
+    "package:stage": "npm run build:lib && node scripts/prepare-npm-package.mjs",
+    "pack:check": "npm run package:stage && npm pack ./npm-package --dry-run --json",
+    "publish:npm": "npm run package:stage && npm publish ./npm-package",
     "preview": "vite preview"
   },
   "peerDependencies": {
