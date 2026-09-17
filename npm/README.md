@@ -10,7 +10,7 @@ The package focuses on reusable controls, navigation, command surfaces, collecti
 npm install uwp_components react react-dom
 ```
 
-React and React DOM are peer dependencies. React 18.3+ and React 19 are covered by the repository CI matrix.
+React and React DOM are peer dependencies. React 18.3+ and React 19 are covered by the compatibility test matrix.
 
 Load the shared stylesheet once near your application entry point:
 
@@ -160,8 +160,6 @@ The visual direction intentionally avoids heavy shadows, oversized rounded cards
 
 Type declarations are included with the package. Domain subpath imports also ship their own declaration entry points.
 
-## Repository
-
-Source code, Showcase, examples, implementation notes, tests, and development documentation live in the GitHub repository:
+## Source
 
 https://github.com/JULESlois/Uwp
