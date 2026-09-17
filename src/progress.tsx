@@ -24,14 +24,16 @@ export const ProgressRing = forwardRef<HTMLDivElement, ProgressRingProps>(functi
   { active = true, size = 'medium', label, className, 'aria-label': ariaLabel, ...props },
   ref,
 ) {
+  const accessibleLabel = ariaLabel ?? label ?? (active ? '正在处理' : '处理已暂停')
+
   return (
     <div
       {...props}
       ref={ref}
       className={classNames('progress-ring', `progress-ring--${size}`, !active && 'progress-ring--paused', className)}
       role="status"
-      aria-live="polite"
-      aria-label={ariaLabel ?? label ?? '正在处理'}
+      aria-live={active ? 'polite' : 'off'}
+      aria-label={accessibleLabel}
       aria-busy={active || undefined}
     >
       <span className="progress-ring__visual" aria-hidden="true">
