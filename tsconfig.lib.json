@@ -8,6 +8,9 @@
     "outDir": "dist-lib",
     "rootDir": "src"
   },
-  "include": ["src/index.ts"],
+  "include": [
+    "src/index.ts",
+    "src/entrypoints/**/*.ts"
+  ],
   "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
 }
