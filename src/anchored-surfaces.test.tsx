@@ -20,4 +20,12 @@ describe('TeachingTip', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss selection tip' }))
     expect(onClose).toHaveBeenCalledTimes(1)
   })
+
+  it('dismisses from the keyboard with Escape', () => {
+    const onClose = vi.fn()
+    render(<TeachingTip open title="Keyboard shortcuts" anchor={<button>Help</button>} onClose={onClose}>Use Ctrl+K to search.</TeachingTip>)
+
+    fireEvent.keyDown(screen.getByRole('dialog', { name: 'Keyboard shortcuts' }), { key: 'Escape' })
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
 })
