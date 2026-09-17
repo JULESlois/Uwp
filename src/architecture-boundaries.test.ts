@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-const modules = import.meta.glob('./{entrypoints/collections.ts,collection-model.ts}', {
+const modules = import.meta.glob('./{entrypoints/collections.ts,collection-model.ts,collections.tsx}', {
   eager: true,
   query: '?raw',
   import: 'default',
@@ -26,5 +26,13 @@ describe('package architecture boundaries', () => {
     expect(model).not.toMatch(/from ['"]react['"]/)
     expect(model).not.toMatch(/from ['"].*components['"]/)
     expect(model).toMatch(/export type ListItem/)
+  })
+
+  it('keeps collection implementations independent from the components barrel', () => {
+    const implementation = source('./collections.tsx')
+
+    expect(implementation).not.toMatch(/from ['"]\.\/components['"]/)
+    expect(implementation).toMatch(/ListItem.*from ['"]\.\/collection-model['"]/)
+    expect(implementation).toMatch(/RadioButton.*from ['"]\.\/selectors['"]/)
   })
 })
