@@ -1,4 +1,4 @@
-name: Publish npm package
+name: Stage npm release
 
 on:
   release:
@@ -9,10 +9,12 @@ permissions:
   id-token: write
 
 jobs:
-  publish:
+  stage:
     if: ${{ !github.event.release.prerelease }}
     runs-on: ubuntu-latest
     environment: npm
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
     steps:
       - name: Checkout release
         uses: actions/checkout@v4
@@ -25,27 +27,26 @@ jobs:
           node-version: 24
           registry-url: https://registry.npmjs.org
 
+      - name: Upgrade npm for staged publishing
+        run: npm install --global npm@^11.15.0
+
       - name: Install dependencies
         run: npm install
 
-      - name: Verify release tag matches package version
-        shell: bash
-        run: |
-          VERSION="$(node -p "require('./package.json').version")"
-          TAG="${{ github.event.release.tag_name }}"
-          if [ "$TAG" != "v$VERSION" ]; then
-            echo "Release tag $TAG does not match package version v$VERSION"
-            exit 1
-          fi
+      - name: Verify release metadata
+        run: npm run release:check
 
       - name: Test
         run: npm test
 
-      - name: Build and verify package
-        run: npm run pack:check
+      - name: Build public API example
+        run: npm run build:example
 
-      - name: Upgrade npm for staged publishing
-        run: npm install --global npm@latest
+      - name: Prepare and verify package
+        run: npm run package:stage
+
+      - name: Verify package tarball
+        run: npm pack ./npm-package --dry-run --json
 
       - name: Stage package on npm
         run: npm stage publish ./npm-package --access public
