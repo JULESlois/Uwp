@@ -17,6 +17,30 @@ describe('progress accessibility contract', () => {
     expect(renderToStaticMarkup(<ProgressBar />)).toContain('aria-label="进度"')
   })
 
+  it('reports active and paused ring state without stale busy semantics', () => {
+    const active = renderToStaticMarkup(<ProgressRing size="large" />)
+    const paused = renderToStaticMarkup(<ProgressRing active={false} />)
+
+    expect(active).toContain('progress-ring--large')
+    expect(active).toContain('aria-live="polite"')
+    expect(active).toContain('aria-busy="true"')
+    expect(paused).toContain('progress-ring--paused')
+    expect(paused).toContain('aria-live="off"')
+    expect(paused).not.toContain('aria-busy=')
+  })
+
+  it('clamps determinate values and normalizes an invalid maximum', () => {
+    const clamped = renderToStaticMarkup(<ProgressBar value={140} max={120} />)
+    const normalized = renderToStaticMarkup(<ProgressBar value={Number.NaN} max={0} />)
+
+    expect(clamped).toContain('aria-valuemax="120"')
+    expect(clamped).toContain('aria-valuenow="120"')
+    expect(clamped).toContain('--progress-value:100%')
+    expect(normalized).toContain('aria-valuemax="100"')
+    expect(normalized).toContain('aria-valuenow="0"')
+    expect(normalized).toContain('--progress-value:0%')
+  })
+
   it('omits determinate value semantics for an indeterminate bar', () => {
     const markup = renderToStaticMarkup(<ProgressBar indeterminate aria-valuetext="等待服务器" />)
 
@@ -24,5 +48,6 @@ describe('progress accessibility contract', () => {
     expect(markup).not.toContain('aria-valuemax=')
     expect(markup).toContain('aria-valuetext="等待服务器"')
     expect(markup).toContain('aria-busy="true"')
+    expect(markup).toContain('progress-bar--indeterminate')
   })
 })
